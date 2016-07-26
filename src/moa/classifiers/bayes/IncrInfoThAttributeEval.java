@@ -271,7 +271,7 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
   }
   
   @Override
-  public void updatePrediction(){
+  public void applySelection(){
 	  if(counts != null && updated) {
 		  m_InfoValues = new double[counts.length];
 		    for (int i = 0; i < counts.length; i++) {

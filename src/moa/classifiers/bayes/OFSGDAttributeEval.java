@@ -218,7 +218,7 @@ public class OFSGDAttributeEval extends ASEvaluation implements
 
 
 	@Override
-	public void updatePrediction() {
+	public void applySelection() {
 		// TODO Auto-generated method stub
 		System.out.println("Weight values: " + Arrays.toString(weights.getElements()));		
 	}

@@ -5,7 +5,6 @@ import java.util.LinkedList;
 import java.util.List;
 
 import moa.classifiers.AbstractClassifier;
-import moa.classifiers.lazy.neighboursearch.EuclideanDistance;
 import moa.core.Measurement;
 import moa.options.ClassOption;
 import moa.options.FloatOption;
@@ -18,16 +17,11 @@ import weka.core.Instances;
  * Learning in non-stationary environments.
  *
  * <p>
- * Ryan Elwell and Robi Polikar. Incremental learning of concept drift in
- * non-stationary environments. IEEE Transactions on Neural Networks,
- * 22(10):1517-1531, October 2011. ISSN 1045-9227. URL
- * http://dx.doi.org/10.1109/TNN.2011.2160459.
+ * I. Žliobaite. Combining similarity in time and space for training set formation under concept drift, 
+ * Intell. Data Anal. 15 (4) (2011) 589–611.
  * </p>
  *
- * @author Paulo Goncalves (paulomgj at gmail dot com)
- * @author Dariusz Brzezinski
- *
- * @version 0.4 (Corrected instance weights in classifier training)
+ * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  *
  */
 @SuppressWarnings("serial")

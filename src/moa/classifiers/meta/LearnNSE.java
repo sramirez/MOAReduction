@@ -28,6 +28,7 @@ import moa.options.*;
  * @version 0.4 (Corrected instance weights in classifier training)
  *
  */
+@SuppressWarnings("serial")
 public class LearnNSE extends AbstractClassifier {
 
     public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',

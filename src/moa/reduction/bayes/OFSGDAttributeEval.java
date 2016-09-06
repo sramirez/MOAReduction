@@ -19,10 +19,11 @@
  *
  */
 
-package moa.classifiers.bayes;
+package moa.reduction.bayes;
 
 import java.util.Arrays;
 
+import moa.reduction.core.MOAAttributeEvaluator;
 import weka.attributeSelection.ASEvaluation;
 import weka.attributeSelection.AttributeEvaluator;
 import weka.core.AlgVector;

@@ -17,7 +17,7 @@
  *    along with this program. If not, see <http://www.gnu.org/licenses/>.
  *    
  */
-package moa.classifiers.bayes;
+package moa.reduction.core;
 
 
 //import weka.attributeSelection.InfoGainAttributeEval; 
@@ -33,6 +33,11 @@ import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
 import moa.options.IntOption;
+import moa.reduction.bayes.IFFDdiscretize;
+import moa.reduction.bayes.IncrInfoThAttributeEval;
+import moa.reduction.bayes.OCdiscretize;
+import moa.reduction.bayes.OFSGDAttributeEval;
+import moa.reduction.bayes.PIDdiscretize;
 
 import java.util.ArrayList;
 import java.util.Collections;

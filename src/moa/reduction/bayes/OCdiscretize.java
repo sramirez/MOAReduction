@@ -19,7 +19,7 @@
  *
  */
 
-package moa.classifiers.bayes;
+package moa.reduction.bayes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +36,7 @@ import java.util.PriorityQueue;
 import java.util.Stack;
 import java.util.TreeMap;
 
+import moa.reduction.core.MOADiscretize;
 import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
 import weka.core.ContingencyTables;

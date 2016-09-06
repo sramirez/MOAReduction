@@ -1,4 +1,4 @@
-package moa.classifiers.bayes;
+package moa.reduction.bayes;
 
 /**
  * Inner class to order attributes while preserving class indices  

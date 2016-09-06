@@ -81,7 +81,7 @@ public abstract class MaintainedCB extends AbstractClassifier {
         this.index = 0;
     }
     
-    private CBRCase createCase(Instance instance) {	
+    protected CBRCase createCase(Instance instance) {	
     	CBRCase _case = new CBRCase();
 		try {			
 			CaseComponent description = (CaseComponent)_connector.descriptionClass.newInstance();
@@ -124,8 +124,6 @@ public abstract class MaintainedCB extends AbstractClassifier {
         	resetLearningImpl();
 
         	TwoStepCaseBaseEditMethod maintenance = getMaintenanceMethod();
-        			//new ICFFull(new RENNNoiseReduction(), new ICFRedundancyRemoval());
-    		//CRRFull maintenance = new ICFFull(new BBNRNoiseReduction(), new CRRRedundancyRemoval());
     		Collection<CBRCase> deleted = maintenance.retrieveCasesToDelete(_caseBase.getCases(), wekaSimConfig);		
     		System.out.println("\nNum Cases deleted by Alg: " + deleted.size());
     		//System.out.println("Cases deleted by Alg: ");

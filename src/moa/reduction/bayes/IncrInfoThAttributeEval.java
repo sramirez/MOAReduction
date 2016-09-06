@@ -19,7 +19,7 @@
  *
  */
 
-package moa.classifiers.bayes;
+package moa.reduction.bayes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import moa.reduction.core.MOAAttributeEvaluator;
 import weka.attributeSelection.ASEvaluation;
 import weka.attributeSelection.AttributeEvaluator;
 import weka.core.Attribute;

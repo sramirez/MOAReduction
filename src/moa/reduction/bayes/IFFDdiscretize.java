@@ -1,4 +1,4 @@
-package moa.classifiers.bayes;
+package moa.reduction.bayes;
 
 /*
  * DiscretizeDynamic.java
@@ -21,6 +21,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
 
+import moa.reduction.core.MOADiscretize;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;

@@ -1,4 +1,4 @@
-package moa.classifiers.bayes;
+package moa.reduction.core;
 
 import weka.core.Instance;
 

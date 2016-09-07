@@ -41,7 +41,7 @@ public abstract class MaintainedCB extends AbstractClassifier {
 	public IntOption kOption = new IntOption("neighbors", 'k',
             "Number of neighbors used in search.", 5, 1, Integer.MAX_VALUE);
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 500, 1, Integer.MAX_VALUE);
+            "Size of the environments.", 250, 1, Integer.MAX_VALUE);
 
     protected long index;
     protected boolean initialized = false;
@@ -150,15 +150,18 @@ public abstract class MaintainedCB extends AbstractClassifier {
 
 	@Override
 	public double[] getVotesForInstance(Instance instance) {
-		CBRCase query = createCase(instance);
-		//BasicClassificationOracle oracle = new BasicClassificationOracle();
-		Collection<CBRCase> cases = _caseBase.getCases();
-		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(cases, query, wekaSimConfig);
-		knn = SelectCases.selectTopKRR(knn, wekaSimConfig.getK());
-		KNNClassificationMethod classifier = wekaSimConfig.getClassificationMethod();
-		ClassificationSolution predictedSolution = classifier.getPredictedSolution(knn);
+		Double solution = new Double(0);
+		if(initialized){
+			CBRCase query = createCase(instance);
+			//BasicClassificationOracle oracle = new BasicClassificationOracle();
+			Collection<CBRCase> cases = _caseBase.getCases();
+			Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(cases, query, wekaSimConfig);
+			knn = SelectCases.selectTopKRR(knn, wekaSimConfig.getK());
+			KNNClassificationMethod classifier = wekaSimConfig.getClassificationMethod();
+			ClassificationSolution predictedSolution = classifier.getPredictedSolution(knn);
+			solution = (Double) predictedSolution.getClassification();
+		}
 
-		Double solution = (Double) predictedSolution.getClassification();
 		double weights[] = new double[solution.intValue() + 1];
 		weights[solution.intValue()] = 1.0;
 		return weights;

@@ -45,7 +45,7 @@ public class FISH extends AbstractClassifier {
     protected List<STInstance> buffer;
     protected long index = 0;
     protected double distanceProp;
-    protected int pruning, k, period;
+    protected int k, period;
   
 
     @Override

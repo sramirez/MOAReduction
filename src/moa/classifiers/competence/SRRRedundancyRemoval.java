@@ -20,24 +20,16 @@ import jcolibri.method.revise.classification.BasicClassificationOracle;
 import jcolibri.method.revise.classification.ClassificationOracle;
 
 /**
- * Provides the ability to run the SRR case base condensation algorithm 
- * on a case base to eliminate redundancy.
+ * Provides the ability to run the Stepwise Redundancy Removal (SRR) algorithm 
+ * on a case base to reduce redundancy.
  * 
  * @author Sergio Ramírez
  * 02/09/16
  */
 public class SRRRedundancyRemoval {
 	
-	/**
-	 * Simulates the RC case base editing algorithm, returning the cases
-	 * that would be deleted by the algorithm.
-	 * @param cases The group of cases on which to perform editing.
-	 * @param simConfig The similarity configuration for these cases.
-	 * @return the list of cases that would be deleted by the 
-	 * RC algorithm.
-	 */
 	protected KNNClassificationConfig simConfig;
-	protected int sizeLimit = 250;
+	protected int sizeLimit;
 	
 	public SRRRedundancyRemoval(KNNClassificationConfig simConfig, int sizeLimit) {
 		// TODO Auto-generated constructor stub
@@ -46,12 +38,17 @@ public class SRRRedundancyRemoval {
 	}
 	
 	@SuppressWarnings("unchecked")
+	/**
+	 * Apply SRR on the current casebase. Only redundant models are removed from CB,
+	 * competence model does not need to be rebuilt.
+	 * @param cases the current model/CB.
+	 * @return The new casebase.
+	 */
 	public Collection<CBRCase> retrieveCasesToDelete(Collection<CBRCase> cases) {
 		
-    	jcolibri.util.ProgressController.init(this.getClass(),"RC Redundancy Removal",jcolibri.util.ProgressController.UNKNOWN_STEPS);
-		List<CBRCase> localCases = new LinkedList<CBRCase>();
-		for(CBRCase c: cases)
-		{	localCases.add(c);
+    	List<CBRCase> localCases = new LinkedList<CBRCase>();
+		for(CBRCase c: cases) {	
+			localCases.add(c);
 		}
 			
 		CompetenceModel sc = new CompetenceModel();		
@@ -78,10 +75,9 @@ public class SRRRedundancyRemoval {
 		
 		boolean[] preserved = new boolean[localCases.size()];
 		LinkedList<CBRCase> locked = new LinkedList<CBRCase>();
-		HashMap<CBRCase, LinkedList<CBRCase>> linked = new HashMap<CBRCase, LinkedList<CBRCase>>();
+		HashMap<CBRCase, List<CBRCase>> linked = new HashMap<CBRCase, List<CBRCase>>();
 		List<CBRCase> allCasesToBeRemoved = new LinkedList<CBRCase>();
 		
-		int nlocked = 0;
 		int npreserv = 0;
 		int ninserted = localCases.size();
 		int ti = 0, i = 0;
@@ -89,7 +85,7 @@ public class SRRRedundancyRemoval {
 		
 		do {
 			locked.clear();
-			while(ninserted - npreserv - nlocked > 0) {
+			while(ninserted - npreserv - locked.size() > 0) {
 				CBRCase x = caseReachabilitySetSizes.get(i).getCase();
 				if(!preserved[i] && !locked.contains(x)) {
 					// Check if x and kL of x can be solved without x in CB
@@ -97,7 +93,7 @@ public class SRRRedundancyRemoval {
 					allCasesToBeRemoved.add(x);
 					
 					boolean solvedK = true;
-					for(CBRCase l: linked.get(i)) {
+					for(CBRCase l: linked.getOrDefault(i, new LinkedList<CBRCase>())) {
 						if(!solves(localCases, l)){
 							solvedK = false;
 							break;
@@ -106,23 +102,24 @@ public class SRRRedundancyRemoval {
 					
 					if(solves(localCases, x) && solvedK) { // line 5
 						try {
-							for(CBRCase l: linked.get(i)) {					
+							for(CBRCase l: linked.getOrDefault(i, new LinkedList<CBRCase>())) {					
 								List<CBRCase> oldLinked = linked.getOrDefault(l, new LinkedList<CBRCase>());
 								oldLinked.addAll(getkNN(sc.getReachabilitySet(l), l, minLock));
+								linked.put(l, oldLinked);
 							}
-							Collection<CBRCase> oldLinked = linked.getOrDefault(x, new LinkedList<CBRCase>());
-							Collection<CBRCase> xreach = sc.getReachabilitySet(x);
-							Collection<CBRCase> minSolve = getkNN(xreach, x, minLock);
-							oldLinked.addAll(minSolve);	
-							locked.addAll(minSolve); nlocked += minSolve.size();
+							List<CBRCase> oldLinked = linked.getOrDefault(x, new LinkedList<CBRCase>());
+							Collection<CBRCase> minSolveX = getkNN(sc.getReachabilitySet(x), x, minLock);
+							oldLinked.addAll(minSolveX);
+							linked.put(x, oldLinked);
+							locked.addAll(minSolveX);
 						} catch (InitializingException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					} else {
 						preserved[i] = true; npreserv++;
-						localCases.add(x);
-						allCasesToBeRemoved.remove(x); ninserted++;
+						localCases.add(x); ninserted++;
+						allCasesToBeRemoved.remove(x);
 					}
 				}			
 				ti++;
@@ -130,10 +127,18 @@ public class SRRRedundancyRemoval {
 			}			
 		} while (ninserted > sizeLimit && locked.size() > 0);
 		
-		jcolibri.util.ProgressController.finish(this.getClass());
+		System.out.println("\nNum of cases removed by SRR: " + allCasesToBeRemoved.size());
 		return allCasesToBeRemoved;
 	}
 	
+	/**
+	 * Evaluates if query element is solved by the current casebase/model.
+	 * The element is considered to be solved if the majority voting of k-neighbors agrees
+	 * with the class of query.
+	 * @param casebase model to be considered
+	 * @param query element to be queried
+	 * @return 
+	 */
 	private boolean solves(Collection<CBRCase> casebase, CBRCase query){
 
 		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
@@ -152,8 +157,12 @@ public class SRRRedundancyRemoval {
 		
 	}
 	
-	private Collection<CBRCase> getkNN(Collection<CBRCase> casebase, CBRCase query, int k) {
-		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
-		return SelectCases.selectTopK(knn, k);
+	private List<CBRCase> getkNN(Collection<CBRCase> casebase, CBRCase query, int k) {
+		List<CBRCase> neighbors = new LinkedList<CBRCase>();
+		if(casebase != null) {
+			Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
+			neighbors = new LinkedList<CBRCase>(SelectCases.selectTopK(knn, k));
+		}
+		return neighbors;
 	}
 }

@@ -39,7 +39,7 @@ public class NEFCSNoiseReduction {
 	protected int l, sizeWindow;
 	protected float pmin, pmax, zcoef = 0.5f;
 	
-	private final static int MIN_PREDICTIONS = 4;
+	private final int MIN_PREDICTIONS;
 	
 	public NEFCSNoiseReduction(KNNClassificationConfig simConfig, int l, int sizeWindow, float pmin, float pmax) {
 		// TODO Auto-generated constructor stub
@@ -51,6 +51,7 @@ public class NEFCSNoiseReduction {
 		deactivatedCases = new LinkedList<CBRCase>();
 		accRegister = new HashMap<CBRCase, LimitedQueue<Boolean>>();
 		relatedSets = new LinkedList<LinkedHashSet<CBRCase>>();
+		MIN_PREDICTIONS = l / 2;
 	}
 	
 	
@@ -115,6 +116,7 @@ public class NEFCSNoiseReduction {
 			novelCases = driftDetector(oldWindow, newWindow);
 		
 		// Check if new cases fulfill the conditional M-BBNR rule
+		List<CBRCase> alreadyRemoved = new LinkedList<CBRCase>();
 		for(CBRCase c: newWindow) {
 			Collection<CBRCase> currLiabilitySet = null;
 			try {	
@@ -124,13 +126,16 @@ public class NEFCSNoiseReduction {
 			}
 			// Check if a new case lies outside the identified concept drift competence areas
 			if(!novelCases.contains(c)) {
-				 if(!(currLiabilitySet.size() > 0 && MBBNRrule(model, c, localCases))) { 
-					 // Element is removed inside this function
-					 newCasestoBeAdded.add(c);
-				 }					 
-			} else {
-				newCasestoBeAdded.add(c);
+				if(currLiabilitySet != null){
+					if(currLiabilitySet.size() > 0 && MBBNRrule(model, c, localCases, alreadyRemoved)) {
+						 // Element is removed inside this function
+						//localCases.remove(c);
+						alreadyRemoved.add(c);
+						continue;
+					}
+				}
 			}
+			newCasestoBeAdded.add(c);
 		}
 		
 		// Create the conflicting list
@@ -139,9 +144,11 @@ public class NEFCSNoiseReduction {
 			for(CBRCase nc: newCasestoBeAdded){
 				try {	
 					Collection<CBRCase> currLiabilitySet = model.getLiabilitySet(c);
-					if(currLiabilitySet.contains(nc)){
-						conflictingList.add(c);
-						break;
+					if(currLiabilitySet != null) {	
+						if(currLiabilitySet.contains(nc)){
+							conflictingList.add(c);
+							break;
+						}
 					}
 				} catch (InitializingException e) {	
 					e.printStackTrace();
@@ -163,10 +170,8 @@ public class NEFCSNoiseReduction {
 
 			if(currLiabilitySet != null) {	
 				liabilitySetSize = currLiabilitySet.size();
-			}
-		
+			}		
 			caseLiabilitySetSizes.add(new CaseResult(c, liabilitySetSize));
-			jcolibri.util.ProgressController.step(this.getClass());
 		}
 		caseLiabilitySetSizes = CaseResult.sortResults(caseLiabilitySetSizes, false);
 		
@@ -177,8 +182,10 @@ public class NEFCSNoiseReduction {
     			break;    
     		}
     		CBRCase nc = highestLiability.getCase();
-    		if(MBBNRrule(model, nc, localCases))
+    		if(MBBNRrule(model, nc, localCases, alreadyRemoved)){
+    			alreadyRemoved.add(nc);
     			newCasestoBeAdded.remove(nc);
+    		}    			
     	}
     	
     	// Apply Context Switching to non-removed new cases 
@@ -186,13 +193,13 @@ public class NEFCSNoiseReduction {
 			contextSwitching(nc, localCases); // local cases can be modified inside this function
 		}
    
-		updateCompetenceModel(localCases);
+		//updateCompetenceModel(localCases);
 		
 		return localCases;
 	}
 	
 	
-	private boolean MBBNRrule(CompetenceModel sc, CBRCase c, Collection<CBRCase> casebase) {
+	private boolean MBBNRrule(CompetenceModel sc, CBRCase c, Collection<CBRCase> casebase, List<CBRCase> alreadyRemoved) {
 		
 		Collection<CBRCase> covSet = null;
 		try {	
@@ -203,16 +210,15 @@ public class NEFCSNoiseReduction {
 
 		casebase.remove(c);
 		
-		boolean rule = true;
 		for(CBRCase query: covSet) {	
-			if(casebase.contains(query)) { // Line 5 (Algorithm 1) paper Li
+			if(!alreadyRemoved.contains(query)) { // Line 5 (Algorithm 1) paper Li
     			if(!solves(casebase, query)){
     				casebase.add(c);
     				return false;
     			}    			
 			}
 		}
-		return rule;
+		return true;
 	}
 	
 	private boolean solves(Collection<CBRCase> casebase, CBRCase query){
@@ -229,24 +235,28 @@ public class NEFCSNoiseReduction {
 			cce.printStackTrace();
 			System.exit(0);
 		}
-		return false;
-		
+		return false;		
 	}
 	
-	/*private Collection<CBRCase> NN(Collection<CBRCase> casebase, CBRCase query, KNNClassificationConfig simConfig){
-		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
-		return SelectCases.selectTopK(knn, simConfig.getK());		
-	}*/
-
+	/**
+	 * It aims at removing groups of obsolete cases by using the interval test used in IB3.
+	 * It is based on the accuracy and retrieval frequency of cases. Cases are freely deactivated 
+	 * and activated inside the procedure.
+	 * @param nc New case to check
+	 * @param casebase Casebase. New case also influences the rest of cases.
+	 */
 	private void contextSwitching(CBRCase nc, Collection<CBRCase> casebase) {
-		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, nc, simConfig);
-		knn = SelectCases.selectTopKRR(knn, simConfig.getK());
-		int deactIndex = knn.size();
 		
-		// We also consider deactivated examples in the classification result
-		Collection<RetrievalResult> knnd = NNScoringMethod.evaluateSimilarity(deactivatedCases, nc, simConfig);
-		knnd = SelectCases.selectTopKRR(knnd, simConfig.getK());
-		knn.addAll(knnd);
+    	List<CBRCase> unifiedcb = new LinkedList<CBRCase>();
+		for(CBRCase c: casebase){	
+			unifiedcb.add(c);
+		}
+		for(CBRCase c: deactivatedCases) {	
+			unifiedcb.add(c);
+		}
+		
+		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(unifiedcb, nc, simConfig);
+		knn = SelectCases.selectTopKRR(knn, simConfig.getK());
 		
 		// Get the prediction result to evaluate examples
 		KNNClassificationMethod classifier = ((KNNClassificationConfig)simConfig).getClassificationMethod();
@@ -255,14 +265,9 @@ public class NEFCSNoiseReduction {
 		boolean isCorrect = oracle.isCorrectPrediction(predictedSolution, nc);
 
 		// Update l predictions for its neighbors
-		int i = 0;
 		for(RetrievalResult rr: knn) {
-			if(i < deactIndex) {
-				updateCS(rr.get_case(), casebase, isCorrect, false);
-			} else {
-				updateCS(rr.get_case(), casebase, isCorrect, true);
-			}
-			i++;
+			boolean deactivated = deactivatedCases.contains(rr.get_case());
+			updateCS(rr.get_case(), casebase, isCorrect, deactivated);
 		}
 	}
 	
@@ -276,12 +281,13 @@ public class NEFCSNoiseReduction {
 			for(Boolean b: register) {
 				if(b) p++;
 			}
-			p /= l;
+			int n = register.size();
+			p /= n;
 			
-			float denom = 1 + zcoef * zcoef / l;
-			float sqrt = (float) Math.sqrt(p * (1 - p) / l + zcoef * zcoef / (4 * l * l));
-			float cimax = (float) ((p + zcoef * zcoef / (2 * l) + zcoef * sqrt) / denom);
-			float cimin = (float) ((p + zcoef * zcoef / (2 * l) - zcoef * sqrt) / denom);
+			float denom = 1 + zcoef * zcoef / n;
+			float sqrt = (float) Math.sqrt(p * (1 - p) / n + zcoef * zcoef / (4 * n * n));
+			float cimax = (float) ((p + zcoef * zcoef / (2 * n) + zcoef * sqrt) / denom);
+			float cimin = (float) ((p + zcoef * zcoef / (2 * n) - zcoef * sqrt) / denom);
 			
 			if(cimax < pmax && !isDeactivated) {
 				casebase.remove(c);
@@ -294,25 +300,15 @@ public class NEFCSNoiseReduction {
 			}
 		}
 	}
-
-	@SuppressWarnings("serial")
-	public class LimitedQueue<E> extends LinkedList<E> {
-	    private int limit;
-
-	    public LimitedQueue(int limit) {
-	        this.limit = limit;
-	    }
-
-	    @Override
-	    public boolean add(E o) {
-	        super.add(o);
-	        while (size() > limit) { super.remove(); }
-	        return true;
-	    }
-	}
 	
-
+	/**
+	 * Detect between two equal-size windows which new elements are the most influenced by the concept drift.
+	 * @param owindow Elements in the old window.
+	 * @param nwindow Elements in the new window.
+	 * @return New elements highly influenced by a new concept.
+	 */
 	private List<CBRCase> driftDetector(Collection<CBRCase> owindow, Collection<CBRCase> nwindow) {
+		List<CBRCase> novelCases = new LinkedList<CBRCase>();
 		if(!relatedSets.isEmpty()) {
 			int rsCount = relatedSets.size();
 	        double[] o_weight = new double[rsCount];
@@ -380,10 +376,9 @@ public class NEFCSNoiseReduction {
 	                }
 	            }
 	            indexes.add(tempIND);
-	            identifiedDis = identifiedDis + maxdis;
+	            identifiedDis += maxdis;
 	        }
-
-	        List<CBRCase> novelCases = new LinkedList<CBRCase>();
+	        
 	        for (int index: indexes) {
 	        	CBRCase agent = relatedSets.get(index).iterator().next(); // It's guaranteed to have at least one element
 	            if (!novelCases.contains(agent)) {
@@ -391,13 +386,9 @@ public class NEFCSNoiseReduction {
 	                    novelCases.add(agent);
 	            }
 	        }
-
-	        return novelCases;
 		}
-		return null;
+		return novelCases;
     }
-	
-
 	
 	private void updateCompetenceModel(Collection<CBRCase> cases){
 		model = new CompetenceModel();
@@ -409,10 +400,11 @@ public class NEFCSNoiseReduction {
 		List<LinkedHashSet<CBRCase>> result = new LinkedList<LinkedHashSet<CBRCase>>();
 		for(CBRCase c: cases){
 			try {
-				LinkedList<CBRCase> cb = new LinkedList<CBRCase>();
+				LinkedHashSet<CBRCase> cb = new LinkedHashSet<CBRCase>();
 				cb.add(c); // Important to be the first
 				cb.addAll(model.getCoverageSet(c));
-				cb.addAll(model.getReachabilitySet(c));				
+				cb.addAll(model.getReachabilitySet(c));	
+				result.add(cb);
 			} catch (InitializingException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -420,4 +412,21 @@ public class NEFCSNoiseReduction {
 		}
 		return result;
 	}
+
+	@SuppressWarnings("serial")
+	public class LimitedQueue<E> extends LinkedList<E> {
+	    private int limit;
+
+	    public LimitedQueue(int limit) {
+	        this.limit = limit;
+	    }
+
+	    @Override
+	    public boolean add(E o) {
+	        super.add(o);
+	        while (size() > limit) { super.remove(); }
+	        return true;
+	    }
+	}
+	
 }

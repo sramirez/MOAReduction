@@ -37,7 +37,7 @@ public class FISH extends AbstractClassifier {
             "distanceProportion",
             'd',
             "Distance proportion between space and time varibles.",
-            1, Float.MIN_VALUE, Float.MAX_VALUE);
+            0.5, 0, 1);
     public IntOption kOption = new IntOption("k", 'k',
             "Number of neighbors.", 3, 1, 50);
 
@@ -76,7 +76,7 @@ public class FISH extends AbstractClassifier {
     
     private void trainClassifier(Classifier c, List<STInstance> instances) {
     	Instances trai = new Instances(instances.get(0).getInstance().dataset());
-    	for(int z = 1; z < instances.size(); z++){
+    	for(int z = 0; z < instances.size(); z++){
     		Instance i = instances.get(z).getInstance();
     		i.setWeight(1);
     		trai.add(i);
@@ -116,29 +116,40 @@ public class FISH extends AbstractClassifier {
             Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
             
             // Compute distances (space/time)
-            //EuclideanDistance distancer = new EuclideanDistance();            
-        	for(STInstance sti : buffer) {            	
-            	double distance = Double.MIN_VALUE;
-				try {
-					distance = euclideanDistance(sti.getInstance(), inst) + 
-							distanceProp * sti.getTime();
+            float[] space = new float[buffer.size()];
+            float[] time = new float[buffer.size()];
+            float maxSpace = Float.MIN_VALUE;
+            int idx = 0;
+            for(STInstance sti : buffer) {            	
+            	try {
+					space[idx] = (float) euclideanDistance(sti.getInstance(), inst);
+					time[idx] = this.index - sti.getTime();
+					if(space[idx] > maxSpace)
+						maxSpace = space[idx];
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-            	sti.setDistance(distance);
+            	idx++;
             }
+            
+            // Normalize distances
+            for (int j = 0; j < time.length; j++) {
+            	float distance = (float) ((1 - distanceProp) * space[j] / maxSpace + 
+            			distanceProp * time[j] / this.index);
+            	buffer.get(j).setDistance(distance);
+			}
+            
             // Sort instances by time/space distance (ascending)
             Collections.sort(buffer);
             
             List<Double> measurements = new LinkedList<Double>();
-			List<STInstance> val = buffer.subList(0, k);
-            // Apply leave-one-out cross validation (validation set formed by top-k nearest neighbors)
+			// Apply leave-one-out cross validation (validation set formed by top-k nearest neighbors)
             for (int i = k; i < buffer.size(); i++){
             	try {
 	            	List<STInstance> tra = buffer.subList(0, i);
 					Instances instancestr = new Instances(tra.get(0).getInstance().dataset());
-            		for(int z = 1; z < tra.size(); z++) {
+            		for(int z = 0; z < tra.size(); z++) {
             			Instance instance = tra.get(z).getInstance();
             			instance.setWeight(1);
             			instancestr.add(instance);
@@ -152,8 +163,8 @@ public class FISH extends AbstractClassifier {
 	            		classifier.buildClassifier(instancestr);
 		            	
 	                	//validate on instance j (from val set)
-	            		int pred = (int) classifier.classifyInstance(val.get(j).getInstance());
-	            		if (pred != val.get(j).getInstance().classValue()) 
+	            		int pred = (int) classifier.classifyInstance(removed);
+	            		if (pred != removed.classValue()) 
 							errors++;
 	                	
 	                	// We add the skipped instance again
@@ -175,10 +186,9 @@ public class FISH extends AbstractClassifier {
             		minval = measurements.get(i);
             	}
             }
-            //System.out.println("New chosen size: " + (min + k));
             List<STInstance> lastTrain = buffer.subList(0, min + k);
+            //System.out.println("New size to train the classifier: " + lastTrain.size());
             trainClassifier(testClassifier, lastTrain);
-            //buffer = lastTrain;
     	}
     	
     	int pred = 0;
@@ -191,6 +201,8 @@ public class FISH extends AbstractClassifier {
 		}
     	double[] v = new double[pred + 1];
     	v[pred] = 1.0;
+    	System.out.println("Prediction: " + pred);
+    	System.out.println("Real value: " + inst.classValue());
     	return v;
     }
 

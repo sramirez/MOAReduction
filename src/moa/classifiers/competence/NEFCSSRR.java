@@ -103,6 +103,7 @@ public class NEFCSSRR extends MaintainedCB {
         		if(nc.size() > limitOption.getValue()){
         			Collection<CBRCase> toRemove = srr.retrieveCasesToDelete(nc);
                 	nc.removeAll(toRemove);
+                	nefcs.removeFromDeactivated(toRemove);
         		}        			
             	_caseBase.forgetAllCases();
             	_caseBase.learnCases(nc);

@@ -2,6 +2,7 @@ package moa.classifiers.competence;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,7 +36,7 @@ public class NEFCSNoiseReduction {
 	protected List<LinkedHashSet<CBRCase>> relatedSets;
 	protected KNNClassificationConfig simConfig;
 	protected HashMap<CBRCase, LimitedQueue<Boolean>> accRegister;
-	protected List<CBRCase> deactivatedCases;
+	protected HashSet<CBRCase> deactivatedCases;
 	protected int l, sizeWindow;
 	protected float pmin, pmax, zcoef = 0.5f;
 	
@@ -48,7 +49,7 @@ public class NEFCSNoiseReduction {
 		this.pmin = pmin;
 		this.pmax = pmax;
 		this.sizeWindow = sizeWindow;
-		deactivatedCases = new LinkedList<CBRCase>();
+		deactivatedCases = new HashSet<CBRCase>();
 		accRegister = new HashMap<CBRCase, LimitedQueue<Boolean>>();
 		relatedSets = new LinkedList<LinkedHashSet<CBRCase>>();
 		MIN_PREDICTIONS = l / 2;
@@ -65,7 +66,7 @@ public class NEFCSNoiseReduction {
 	 * NEFCS algorithm.
 	 */
 	@SuppressWarnings("unchecked")
-	public List<CBRCase> applyMaintenance(Collection<CBRCase> newWindow, Collection<CBRCase> oldWindow, Collection<CBRCase> caseBase) {	
+	public Collection<CBRCase> applyMaintenance(Collection<CBRCase> newWindow, Collection<CBRCase> oldWindow, Collection<CBRCase> caseBase) {	
 		/*
 		 * Modified Blame-based Noise Reduction (BBNR) Algorithm
 		 * T, Training Set
@@ -99,7 +100,7 @@ public class NEFCSNoiseReduction {
 		
 		// New and old examples are united in a single local case base 
 		// which will be modified throughout all the process
-    	List<CBRCase> localCases = new LinkedList<CBRCase>();
+    	HashSet<CBRCase> localCases = new HashSet<CBRCase>();
 		for(CBRCase c: caseBase){	
 			localCases.add(c);
 		}
@@ -199,7 +200,7 @@ public class NEFCSNoiseReduction {
 	}
 	
 	
-	private boolean MBBNRrule(CompetenceModel sc, CBRCase c, Collection<CBRCase> casebase, List<CBRCase> alreadyRemoved) {
+	private boolean MBBNRrule(CompetenceModel sc, CBRCase c, HashSet<CBRCase> casebase, List<CBRCase> alreadyRemoved) {
 		
 		Collection<CBRCase> covSet = null;
 		try {	
@@ -209,6 +210,7 @@ public class NEFCSNoiseReduction {
 		}
 
 		casebase.remove(c);
+		deactivatedCases.remove(c);
 		
 		for(CBRCase query: covSet) {	
 			if(!alreadyRemoved.contains(query)) { // Line 5 (Algorithm 1) paper Li
@@ -221,7 +223,7 @@ public class NEFCSNoiseReduction {
 		return true;
 	}
 	
-	private boolean solves(Collection<CBRCase> casebase, CBRCase query){
+	private boolean solves(HashSet<CBRCase> casebase, CBRCase query){
 
 		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
 		knn = SelectCases.selectTopKRR(knn, simConfig.getK());
@@ -245,7 +247,7 @@ public class NEFCSNoiseReduction {
 	 * @param nc New case to check
 	 * @param casebase Casebase. New case also influences the rest of cases.
 	 */
-	private void contextSwitching(CBRCase nc, Collection<CBRCase> casebase) {
+	private void contextSwitching(CBRCase nc, HashSet<CBRCase> casebase) {
 		
     	List<CBRCase> unifiedcb = new LinkedList<CBRCase>();
 		for(CBRCase c: casebase){	
@@ -271,7 +273,7 @@ public class NEFCSNoiseReduction {
 		}
 	}
 	
-	private void updateCS(CBRCase c, Collection<CBRCase> casebase, boolean isCorrect, boolean isDeactivated) {
+	private void updateCS(CBRCase c, HashSet<CBRCase> casebase, boolean isCorrect, boolean isDeactivated) {
 		LimitedQueue<Boolean> register = accRegister.getOrDefault(c, new LimitedQueue<Boolean>(this.l));
 		register.add(isCorrect);
 		accRegister.put(c, register);
@@ -427,6 +429,10 @@ public class NEFCSNoiseReduction {
 	        while (size() > limit) { super.remove(); }
 	        return true;
 	    }
+	}
+	
+	public void removeFromDeactivated(Collection<CBRCase> l) {
+		deactivatedCases.removeAll(l);		
 	}
 	
 }

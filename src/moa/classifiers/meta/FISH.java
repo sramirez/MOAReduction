@@ -76,7 +76,11 @@ public class FISH extends AbstractClassifier {
     
     private void trainClassifier(Classifier c, List<STInstance> instances) {
     	Instances trai = new Instances(instances.get(0).getInstance().dataset());
-    	for(int z = 1; z < instances.size(); z++) trai.add(instances.get(z).getInstance());
+    	for(int z = 1; z < instances.size(); z++){
+    		Instance i = instances.get(z).getInstance();
+    		i.setWeight(1);
+    		trai.add(i);
+    	}
 		try {
 			c.buildClassifier(trai);
 		} catch (Exception e) {
@@ -135,7 +139,9 @@ public class FISH extends AbstractClassifier {
 	            	List<STInstance> tra = buffer.subList(0, i);
 					Instances instancestr = new Instances(tra.get(0).getInstance().dataset());
             		for(int z = 1; z < tra.size(); z++) {
-            			instancestr.add(tra.get(z).getInstance());
+            			Instance instance = tra.get(z).getInstance();
+            			instance.setWeight(1);
+            			instancestr.add(instance);
             		}
             		
 	            	double errors = 0;
@@ -177,7 +183,8 @@ public class FISH extends AbstractClassifier {
     	
     	int pred = 0;
 		try {
-			pred = (int) testClassifier.classifyInstance(inst);
+			if(index != 0)
+				pred = (int) testClassifier.classifyInstance(inst);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

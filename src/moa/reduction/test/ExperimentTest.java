@@ -1,6 +1,8 @@
 package moa.reduction.test;
 
 import moa.classifiers.competence.NEFCSSRR;
+import moa.classifiers.meta.FISH;
+import moa.classifiers.meta.LearnNSE;
 import moa.classifiers.trees.HoeffdingTree;
 import moa.classifiers.Classifier;
 import moa.core.TimingUtils;
@@ -18,9 +20,9 @@ public class ExperimentTest {
         }
 
         public void run(int numInstances, boolean isTesting){
-                Classifier learner = new NEFCSSRR();
+                Classifier learner = new FISH();
                 
-                RandomRBFGenerator stream = new RandomRBFGeneratorDrift();
+                RandomRBFGenerator stream = new RandomRBFGenerator();
                 stream.prepareForUse();
 
                 learner.setModelContext(stream.getHeader());

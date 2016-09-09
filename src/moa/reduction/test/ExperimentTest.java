@@ -20,7 +20,7 @@ public class ExperimentTest {
         public void run(int numInstances, boolean isTesting){
                 Classifier learner = new NaiveBayesReduction();
                 
-                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/blips.arff", 20);
+                RandomRBFGenerator stream = new RandomRBFGenerator();
                 stream.prepareForUse();
 
                 learner.setModelContext(stream.getHeader());

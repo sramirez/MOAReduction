@@ -27,156 +27,57 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.Stack;
 import java.util.TreeMap;
 
 import moa.reduction.core.MOADiscretize;
-import weka.core.Capabilities;
-import weka.core.Capabilities.Capability;
 import weka.core.Instance;
 import weka.core.Range;
-import weka.core.RevisionUtils;
 import weka.core.Utils;
-import weka.filters.Filter;
-import weka.filters.SupervisedFilter;
 
 /**
- <!-- globalinfo-start -->
- * An instance filter that discretizes a range of numeric attributes in the dataset into nominal attributes.
- * Discretization is by Fayyad &amp; Irani's MDL method (the default).<br/>
+ * Online ChiMerge Algorith<br/>
  * <br/>
  * For more information, see:<br/>
  * <br/>
- * Usama M. Fayyad, Keki B. Irani: Multi-interval discretization of continuousvalued attributes for classification learning. In: Thirteenth International Joint Conference on Articial Intelligence, 1022-1027, 1993.<br/>
- * <br/>
- * Igor Kononenko: On Biases in Estimating Multi-Valued Attributes. In: 14th International Joint Conference on Articial Intelligence, 1034-1040, 1995.
+ * https://link.springer.com/chapter/10.1007%2F978-3-642-23241-1_10<br/>
  * <p/>
- <!-- globalinfo-end -->
  * 
- <!-- technical-bibtex-start -->
- * BibTeX:
- * <pre>
- * &#64;inproceedings{Fayyad1993,
- *    author = {Usama M. Fayyad and Keki B. Irani},
- *    booktitle = {Thirteenth International Joint Conference on Articial Intelligence},
- *    pages = {1022-1027},
- *    publisher = {Morgan Kaufmann Publishers},
- *    title = {Multi-interval discretization of continuousvalued attributes for classification learning},
- *    volume = {2},
- *    year = {1993}
- * }
- * </pre>
- * <p/>
- <!-- technical-bibtex-end -->
- * 
- <!-- options-start -->
- * Valid options are: <p/>
- * 
- * <pre> -R &lt;col1,col2-col4,...&gt;
- *  Specifies list of columns to Discretize. First and last are valid indexes.
- *  (default none)</pre>
- * 
- * <pre> -V
- *  Invert matching sense of column indexes.</pre>
- * 
- * <pre> -D
- *  Output binary attributes for discretized attributes.</pre>
- * 
- * <pre> -Y
- *  Use bin numbers rather than ranges for discretized attributes.</pre>
- * 
- * <pre> -E
- *  Use better encoding of split point for MDL.</pre>
- * 
- * <pre> -precision &lt;integer&gt;
- *  Precision for bin boundary labels.
- *  (default = 6 decimal places).</pre>
- * 
- <!-- options-end -->
- * 
- * @author Len Trigg (trigg@cs.waikato.ac.nz)
- * @author Eibe Frank (eibe@cs.waikato.ac.nz)
- * @version $Revision: 12037 $
+ * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscretize{
+public class OCdiscretize implements MOADiscretize{
 
-  /** for serialization */
-  static final long serialVersionUID = -3141006402280129097L;
 
   /** Stores which columns to Discretize */
-  protected Range m_DiscretizeCols = new Range();
+  protected Range m_DiscretizeCols;
 
   /** The number of bins to divide the attribute into */
+  protected float totalCount;
   
-  protected float totalCount = 0;
-  
-  /** The desired weight of instances per bin */
-  protected double m_DesiredWeightOfInstancesPerInterval = -1;
-
-  protected ArrayList<TreeMap<Double, Bin>> trees = null;
-  
+  protected ArrayList<TreeMap<Double, Bin>> trees;  
   protected List<Iterator<Double>> it_bin;
-  //protected List<Bin> current_bin, previous_bin;
   protected List<Bin> previous_bin;
-  protected List<Interval> last_interval;
-  
+  protected List<Interval> last_interval;  
   protected List<PriorityQueue<Interval>> interval_q;
   protected List<List<Interval>> interval_l;
   protected List<LinkedList<Pair>> example_q;
-  
-  protected int[] phases = null;
+  protected int[] phases;
+  protected int initialElements = 100;
 
   /** Output binary attributes for discretized attributes. */
   protected boolean m_MakeBinary = false;
 
-  /** Use bin numbers rather than ranges for discretized attributes. */
-  protected boolean m_UseBinNumbers = false;
-
-  /** Use better encoding of split point for MDL. */
-  protected boolean m_UseBetterEncoding = false;
-
-  /** Precision for bin range labels */
-  protected int m_BinRangePrecision = 6;
-
   /** Constructor - initializes the filter */
   public OCdiscretize() {
-
-    setAttributeIndices("first-last");
+	  m_DiscretizeCols = new Range();	  
+	  totalCount = 0;
+	  trees = null;
+	  setAttributeIndices("first-last");
   }
-
-  /**
-   * Returns the Capabilities of this filter.
-   * 
-   * @return the capabilities of this object
-   * @see Capabilities
-   */
-  @Override
-  public Capabilities getCapabilities() {
-    Capabilities result = super.getCapabilities();
-    result.disableAll();
-
-    // attributes
-    result.enableAllAttributes();
-    result.enable(Capability.MISSING_VALUES);
-
-    // class
-    result.enable(Capability.NOMINAL_CLASS);
-
-    return result;
-  }
-
-  /**
-   * Returns a string describing this filter
-   * 
-   * @return a description of the filter suitable for displaying in the
-   *         explorer/experimenter gui
-   */
-  public String globalInfo() {
-
-    return "An instance filter that discretizes a range of numeric"
-      + " attributes in the dataset into nominal attributes."
-      + " Discretization is by Fayyad & Irani's MDL method (the default).\n\n"
-      + "For more information, see:\n\n";
+  
+  public OCdiscretize(int[] attributes, int initial) {
+	  this();
+	  this.initialElements = initial;
+	  setAttributeIndicesArray(attributes);
   }
   
   /**
@@ -239,6 +140,33 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
     return cutpoints;
   }
   
+
+  
+  public Instance applyDiscretization(Instance inst) {
+	  if(trees != null)
+		  return convertInstance(inst);
+	  return inst;
+  } 
+  
+  public void updateEvaluator(Instance instance) {
+	  
+	  if(trees == null) {
+		  initialize(instance);
+	  }
+		  
+	  totalCount++;
+	  	
+	  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
+		  if ((m_DiscretizeCols.isInRange(i))
+			  && (instance.attribute(i).isNumeric())
+			  && (instance.classIndex() != i)) {
+			  	if (!instance.isMissing(i)) {		  
+			  		OnlineChiMerge(i, instance); 
+			  	}  
+		  }
+	  }
+  }
+
   private void initialize(Instance inst){
 	  
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);	  
@@ -247,7 +175,6 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 	  interval_l = new ArrayList<List<Interval>>();
 	  example_q = new ArrayList<LinkedList<Pair>>();
 	  it_bin = new ArrayList<Iterator<Double>>();
-	  //current_bin = new ArrayList<Bin>();
 	  previous_bin = new ArrayList<Bin>();
 	  last_interval = new ArrayList<Interval>();
 	  
@@ -261,50 +188,7 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 		  it_bin.add(Collections.emptyIterator());
 		  previous_bin.add(new Bin());
 		  last_interval.add(new Interval());		  
-	  }
-	  
-	  
-  }
-  
-  public Instance applyDiscretization(Instance inst) {
-	  if(trees != null)
-		  return convertInstance(inst);
-	  return inst;
-  }
-  
-  private float computeQ(Interval int1, Interval int2){
-	// Total number of examples in the two intervals
-      int N = int1.n + int2.n;
-
-      // The result
-      float qval = 0;
-
-      // Sum over all the classes
-      for(int j = 0; j < int1.distrib.length; ++j)
-      {
-          int Cj = int1.distrib[j] + int2.distrib[j];
-          float Eij, d;
-
-          // interval 1
-          Eij = int1.n * Cj / (float) N;
-          if(Eij == 0) {
-        	  qval += Float.POSITIVE_INFINITY;
-          } else {
-              d = (int1.distrib[j] - Eij);
-              qval += d*d/Eij;
-          }
-
-          // interval 2
-          Eij = int1.n * Cj / (float) N;
-          if(Eij == 0)
-              qval += Float.POSITIVE_INFINITY;
-          else {
-              d = (int2.distrib[j] - Eij);
-              qval += d*d/Eij;
-          }
-      }
-
-      return qval;
+	  }  
   }
   
   private void OnlineChiMerge(int index, Instance inst){
@@ -313,7 +197,7 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 	  if(phases[index] == 0){
 		  addToMainTree(index, inst.value(index), inst.classValue(), inst.numAttributes());
 		  
-		  if(totalCount >= 20){
+		  if(totalCount >= initialElements){
 			  it_bin.set(index, trees.get(index).navigableKeySet().iterator());
 			  previous_bin.set(index, trees.get(index).lastEntry().getValue());
 			  interval_q.set(index, new PriorityQueue<Interval>(trees.get(index).size() - 1));
@@ -373,13 +257,19 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 
 				  interval_q.get(index).remove(prev);
 				  interval_q.get(index).offer(prev);
-			  }
+			  }			  
+		  } else {
+			  Interval next = array[0];			  
+			  interval_q.get(index).remove(next);			  
+			  interval_l.get(index).remove(next);			  
 			  
 			  if(interval_q.get(index).isEmpty()){
 				  Pair p = example_q.get(index).pollLast();
 				  addToMainTree(index, p.value, p.clas, inst.numAttributes());
 				  phases[index] = 3;
 			  }
+			  
+			  
 		  }
 	  } else { // phase = 3
 		  addToMainTree(index, value, inst.classValue(), inst.numAttributes());
@@ -393,23 +283,39 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
   }
   
   
-  public void updateEvaluator(Instance instance) {
-	  
-	  if(trees == null) {
-		  initialize(instance);
-	  }
-		  
-	  	totalCount += 1;
-	  	
-	    for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-	      if ((m_DiscretizeCols.isInRange(i))
-	        && (instance.attribute(i).isNumeric())
-	        && (instance.classIndex() != i)) {
-	    	  if (!instance.isMissing(i)) {		  
-	  	        OnlineChiMerge(i, instance); 
-	    	  }  
-	      }
-	    }
+  private float computeQ(Interval int1, Interval int2){
+	// Total number of examples in the two intervals
+      int N = int1.n + int2.n;
+
+      // The result
+      float qval = 0;
+
+      // Sum over all the classes
+      for(int j = 0; j < int1.distrib.length; ++j)
+      {
+          int Cj = int1.distrib[j] + int2.distrib[j];
+          float Eij, d;
+
+          // interval 1
+          Eij = int1.n * Cj / (float) N;
+          if(Eij == 0) {
+        	  qval += Float.POSITIVE_INFINITY;
+          } else {
+              d = (int1.distrib[j] - Eij);
+              qval += d*d/Eij;
+          }
+
+          // interval 2
+          Eij = int1.n * Cj / (float) N;
+          if(Eij == 0)
+              qval += Float.POSITIVE_INFINITY;
+          else {
+              d = (int2.distrib[j] - Eij);
+              qval += d*d/Eij;
+          }
+      }
+
+      return qval;
   }
   
   /**
@@ -488,30 +394,10 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
     return(instance);
   }
 
-  /**
-   * Returns the revision string.
-   * 
-   * @return the revision
-   */
-  @Override
-  public String getRevision() {
-    return RevisionUtils.extract("$Revision: 12037 $");
-  }
-
-  /**
-   * Main method for testing this class.
-   * 
-   * @param argv should contain arguments to the filter: use -h for help
-   */
-  public static void main(String[] argv) {
-    runFilter(new OCdiscretize(), argv);
-  }
-  
   private class Bin {
 
 	    final double value;
 	    int[] distrib;
-	    int n;
 
 	    public Bin(){
 	    	this(Double.NEGATIVE_INFINITY, 1);
@@ -522,30 +408,14 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 	    	distrib = new int[numClasses];
 	    	for(int i = 0; i < numClasses; ++i)
                 distrib[i] = 0;
-	    	n = 0;
-	    }
-	    
-	    public Bin(Bin other) {
-	    	value = other.value;
-	    	distrib = new int[other.distrib.length];
-	    	for(int i = 0; i < distrib.length; ++i)
-	    		distrib[i] = other.distrib[i];
-	    	n = other.n;
 	    }
 	    
 	    public void feed(int label) {
 	    	distrib[label] += 1;
-	    	n += 1;
-	    }
-	    
-	    public void feed(Bin other) {
-	    	for(int i = 0; i < distrib.length; ++i)
-                distrib[i] += other.distrib[i];
-	    	n += other.n;
 	    }
   }
   
-  private class Interval implements Comparable {
+  private class Interval implements Comparable<Interval> {
 
 	    double lower;
 	    int[] distrib;
@@ -569,7 +439,7 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 	    
 	    public void merge(Interval other){
 	    	 for(int i = 0; i < distrib.length; ++i)
-	                distrib[i] = other.distrib[i];
+	                distrib[i] += other.distrib[i];
 	    	 n += other.n;
 	    	 lower = Math.min(lower, other.lower);
 	    }
@@ -579,11 +449,9 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
 		}
 
 		@Override
-		public int compareTo(Object o) {
+		public int compareTo(Interval o) {
 			// TODO Auto-generated method stub
-			Interval other = (Interval) o;
-			// reverse the comparison
-			return Float.compare(this.qval, other.qval);
+			return Float.compare(this.qval, o.qval);
 		}
   }
   

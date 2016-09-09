@@ -25,6 +25,7 @@ import weka.core.Instances;
  *
  */
 @SuppressWarnings("serial")
+// Version 2 of FISH family of algorithms.
 public class FISH extends AbstractClassifier {
 
     public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
@@ -201,8 +202,8 @@ public class FISH extends AbstractClassifier {
 		}
     	double[] v = new double[pred + 1];
     	v[pred] = 1.0;
-    	System.out.println("Prediction: " + pred);
-    	System.out.println("Real value: " + inst.classValue());
+    	//boolean good = pred == (int) inst.classValue();
+    	//System.out.println("Good prediction?: " + good);
     	return v;
     }
 

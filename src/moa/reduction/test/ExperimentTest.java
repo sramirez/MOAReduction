@@ -1,16 +1,14 @@
 package moa.reduction.test;
 
-import moa.classifiers.competence.NEFCSSRR;
-import moa.classifiers.meta.FISH;
-import moa.classifiers.meta.LearnNSE;
-import moa.classifiers.trees.HoeffdingTree;
-import moa.classifiers.Classifier;
-import moa.core.TimingUtils;
-import moa.streams.generators.RandomRBFGenerator;
-import moa.streams.generators.RandomRBFGeneratorDrift;
-
 import java.io.IOException;
 
+import moa.classifiers.Classifier;
+import moa.classifiers.competence.NEFCSSRR;
+import moa.classifiers.meta.FISH;
+import moa.core.TimingUtils;
+import moa.reduction.core.NaiveBayesReduction;
+import moa.streams.ArffFileStream;
+import moa.streams.generators.RandomRBFGenerator;
 import weka.core.Instance;
 
 
@@ -20,9 +18,9 @@ public class ExperimentTest {
         }
 
         public void run(int numInstances, boolean isTesting){
-                Classifier learner = new FISH();
+                Classifier learner = new NaiveBayesReduction();
                 
-                RandomRBFGenerator stream = new RandomRBFGenerator();
+                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/blips.arff", 20);
                 stream.prepareForUse();
 
                 learner.setModelContext(stream.getHeader());

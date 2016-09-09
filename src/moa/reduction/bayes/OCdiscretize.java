@@ -22,16 +22,10 @@
 package moa.reduction.bayes;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.Stack;
 import java.util.TreeMap;
@@ -39,24 +33,17 @@ import java.util.TreeMap;
 import moa.reduction.core.MOADiscretize;
 import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
-import weka.core.ContingencyTables;
-import weka.core.DenseInstance;
 import weka.core.Instance;
-import weka.core.Instances;
 import weka.core.Range;
 import weka.core.RevisionUtils;
-import weka.core.SparseInstance;
-import weka.core.TechnicalInformation;
-import weka.core.TechnicalInformation.Field;
-import weka.core.TechnicalInformation.Type;
-import weka.core.TechnicalInformationHandler;
 import weka.core.Utils;
 import weka.filters.Filter;
 import weka.filters.SupervisedFilter;
 
 /**
  <!-- globalinfo-start -->
- * An instance filter that discretizes a range of numeric attributes in the dataset into nominal attributes. Discretization is by Fayyad &amp; Irani's MDL method (the default).<br/>
+ * An instance filter that discretizes a range of numeric attributes in the dataset into nominal attributes.
+ * Discretization is by Fayyad &amp; Irani's MDL method (the default).<br/>
  * <br/>
  * For more information, see:<br/>
  * <br/>
@@ -135,7 +122,7 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
   
   protected List<PriorityQueue<Interval>> interval_q;
   protected List<List<Interval>> interval_l;
-  protected List<Stack<Pair>> example_q;
+  protected List<LinkedList<Pair>> example_q;
   
   protected int[] phases = null;
 
@@ -151,9 +138,7 @@ public class OCdiscretize extends Filter implements SupervisedFilter, MOADiscret
   /** Precision for bin range labels */
   protected int m_BinRangePrecision = 6;
 
-private int phase;
-
-  /** Constructor - initialises the filter */
+  /** Constructor - initializes the filter */
   public OCdiscretize() {
 
     setAttributeIndices("first-last");
@@ -260,7 +245,7 @@ private int phase;
 	  trees = new ArrayList<TreeMap<Double, Bin>>(inst.numAttributes());
 	  interval_q = new ArrayList<PriorityQueue<Interval>>();
 	  interval_l = new ArrayList<List<Interval>>();
-	  example_q = new ArrayList<Stack<Pair>>();
+	  example_q = new ArrayList<LinkedList<Pair>>();
 	  it_bin = new ArrayList<Iterator<Double>>();
 	  //current_bin = new ArrayList<Bin>();
 	  previous_bin = new ArrayList<Bin>();
@@ -272,7 +257,7 @@ private int phase;
 		  phases[i] = 0;
 		  interval_q.add(new PriorityQueue<Interval>());
 		  interval_l.add(new ArrayList<Interval>());
-		  example_q.add(new Stack<Pair>());
+		  example_q.add(new LinkedList<Pair>());
 		  it_bin.add(Collections.emptyIterator());
 		  previous_bin.add(new Bin());
 		  last_interval.add(new Interval());		  
@@ -282,7 +267,9 @@ private int phase;
   }
   
   public Instance applyDiscretization(Instance inst) {
-	  return convertInstance(inst);
+	  if(trees != null)
+		  return convertInstance(inst);
+	  return inst;
   }
   
   private float computeQ(Interval int1, Interval int2){
@@ -334,7 +321,7 @@ private int phase;
 		  }
 	  } else if (phases[index] == 1) {
 		  
-		  example_q.get(index).push(new Pair(value, inst.classValue()));
+		  example_q.get(index).add(new Pair(value, inst.classValue()));
 		  if(it_bin.get(index).hasNext()) {
 			  double key = it_bin.get(index).next();
 			  Bin cbin = trees.get(index).get(key);
@@ -358,7 +345,7 @@ private int phase;
 	  } else if (phases[index] == 2) {
 		  addToMainTree(index, inst.value(index), inst.classValue(), inst.numAttributes());
 		  
-		  Pair pel = example_q.get(index).pop();
+		  Pair pel = example_q.get(index).pollLast();
 		  
 		  addToMainTree(index, pel.value, pel.clas, inst.numAttributes());
 		  
@@ -370,33 +357,33 @@ private int phase;
 			  Interval best = array[1];
 			  best.merge(next);
 			  
-			  if(next.heap_index != -1) interval_q.remove(next);
+			  interval_q.get(index).remove(next);			  
+			  interval_l.get(index).remove(next);			  
 			  
-			  interval_l.remove(next);
-			  
-			  if(!next.equals(interval_l.get(index).get(interval_l.get(index).size() - 1))){
+			  if(interval_l.get(index).size() > 2){ // There are more elements
+				  next = array[2];
 				  best.qval = computeQ(best, next);
-				  interval_q.remove(best);
+				  interval_q.get(index).remove(best);
 				  interval_q.get(index).offer(best);
 			  }
 			  
 			  if(!best.equals(interval_l.get(index).get(0))) {
 				  Interval prev = array[array.length - 1];
-				  
 				  prev.qval = computeQ(prev, best);
-				  interval_q.remove(prev);
+
+				  interval_q.get(index).remove(prev);
 				  interval_q.get(index).offer(prev);
 			  }
 			  
-			  if(interval_q.isEmpty()){
-				  Pair p = example_q.get(index).pop();
+			  if(interval_q.get(index).isEmpty()){
+				  Pair p = example_q.get(index).pollLast();
 				  addToMainTree(index, p.value, p.clas, inst.numAttributes());
 				  phases[index] = 3;
 			  }
 		  }
 	  } else { // phase = 3
 		  addToMainTree(index, value, inst.classValue(), inst.numAttributes());
-	  }
+	  }	
   }
   
   private void addToMainTree(int index, double value, double clas, int na){
@@ -423,28 +410,6 @@ private int phase;
 	    	  }  
 	      }
 	    }
-  }
-  
-  /**
-   * Get a bin range string for a specified bin of some attribute's cut points.
-   * 
-   * @param cutPoints The attribute's cut points; never null.
-   * @param j The bin number (zero based); never out of range.
-   * @param precision the precision for the range values
-   * 
-   * @return The bin range string.
-   */
-  private static String binRangeString(double[] cutPoints, int j, int precision) {
-    assert cutPoints != null;
-
-    int n = cutPoints.length;
-    assert 0 <= j && j <= n;
-
-    return j == 0 ? "" + "(" + "-inf" + "-"
-      + Utils.doubleToString(cutPoints[0], precision) + "]" : j == n ? "" + "("
-      + Utils.doubleToString(cutPoints[n - 1], precision) + "-" + "inf" + ")"
-      : "" + "(" + Utils.doubleToString(cutPoints[j - 1], precision) + "-"
-        + Utils.doubleToString(cutPoints[j], precision) + "]";
   }
   
   /**
@@ -586,7 +551,6 @@ private int phase;
 	    int[] distrib;
 	    int n;
 	    float qval;
-	    int heap_index;
 	    
 	    public Interval(){
 	    	this(Double.NEGATIVE_INFINITY, new int[1]);
@@ -600,9 +564,7 @@ private int phase;
 	    		distrib[i] = distr[i];
 		    	n += distr[i];
 	    	}
-	    	qval = Float.POSITIVE_INFINITY;
-	    	heap_index = -1;
-              
+	    	qval = Float.POSITIVE_INFINITY;              
 	    }
 	    
 	    public void merge(Interval other){

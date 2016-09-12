@@ -75,7 +75,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
 
     public static IntOption numFeaturesOption = new IntOption("numFeatures", 'f', "The number of features to select", 1, 1, Integer.MAX_VALUE);
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', "Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
-    public static IntOption discmethodOption = new IntOption("discMethod", 'd', "Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 3, 0, 3);
+    public static IntOption discmethodOption = new IntOption("discMethod", 'd', "Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
     

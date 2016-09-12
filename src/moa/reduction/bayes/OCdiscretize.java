@@ -74,10 +74,14 @@ public class OCdiscretize implements MOADiscretize{
 	  setAttributeIndices("first-last");
   }
   
-  public OCdiscretize(int[] attributes, int initial) {
+  public OCdiscretize(int[] attributes) {
+	  this();
+	  setAttributeIndicesArray(attributes);
+  }
+  
+  public OCdiscretize(int initial) {
 	  this();
 	  this.initialElements = initial;
-	  setAttributeIndicesArray(attributes);
   }
   
   /**

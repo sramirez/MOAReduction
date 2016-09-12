@@ -28,117 +28,53 @@ import java.util.List;
 import java.util.Map;
 
 import moa.reduction.core.MOADiscretize;
-import weka.core.Capabilities;
-import weka.core.Capabilities.Capability;
 import weka.core.ContingencyTables;
-import weka.core.DenseInstance;
 import weka.core.Instance;
-import weka.core.Instances;
 import weka.core.Range;
-import weka.core.RevisionUtils;
-import weka.core.SparseInstance;
-import weka.core.TechnicalInformation;
-import weka.core.TechnicalInformation.Field;
-import weka.core.TechnicalInformation.Type;
-import weka.core.TechnicalInformationHandler;
 import weka.core.Utils;
-import weka.filters.Filter;
-import weka.filters.SupervisedFilter;
 
 /**
  <!-- globalinfo-start -->
- * An instance filter that discretizes a range of numeric attributes in the dataset into nominal attributes. Discretization is by Fayyad &amp; Irani's MDL method (the default).<br/>
+ * Partition Incremental Discretization (PiD)
  * <br/>
  * For more information, see:<br/>
  * <br/>
- * Usama M. Fayyad, Keki B. Irani: Multi-interval discretization of continuousvalued attributes for classification learning. In: Thirteenth International Joint Conference on Articial Intelligence, 1022-1027, 1993.<br/>
+ * João Gama and Carlos Pinto. 2006. Discretization from data streams: applications to histograms and data mining. 
+ * In Proceedings of the 2006 ACM symposium on Applied computing (SAC '06). ACM, New York, NY, USA, 662-667. DOI=http://dx.doi.org/10.1145/1141277.1141429
  * <br/>
- * Igor Kononenko: On Biases in Estimating Multi-Valued Attributes. In: 14th International Joint Conference on Articial Intelligence, 1034-1040, 1995.
- * <p/>
- <!-- globalinfo-end -->
- * 
- <!-- technical-bibtex-start -->
- * BibTeX:
- * <pre>
- * &#64;inproceedings{Fayyad1993,
- *    author = {Usama M. Fayyad and Keki B. Irani},
- *    booktitle = {Thirteenth International Joint Conference on Articial Intelligence},
- *    pages = {1022-1027},
- *    publisher = {Morgan Kaufmann Publishers},
- *    title = {Multi-interval discretization of continuousvalued attributes for classification learning},
- *    volume = {2},
- *    year = {1993}
- * }
- * </pre>
- * <p/>
- <!-- technical-bibtex-end -->
- * 
- <!-- options-start -->
- * Valid options are: <p/>
- * 
- * <pre> -R &lt;col1,col2-col4,...&gt;
- *  Specifies list of columns to Discretize. First and last are valid indexes.
- *  (default none)</pre>
- * 
- * <pre> -V
- *  Invert matching sense of column indexes.</pre>
- * 
- * <pre> -D
- *  Output binary attributes for discretized attributes.</pre>
- * 
- * <pre> -Y
- *  Use bin numbers rather than ranges for discretized attributes.</pre>
- * 
- * <pre> -E
- *  Use better encoding of split point for MDL.</pre>
- * 
- * <pre> -precision &lt;integer&gt;
- *  Precision for bin boundary labels.
- *  (default = 6 decimal places).</pre>
- * 
- <!-- options-end -->
- * 
- * @author Len Trigg (trigg@cs.waikato.ac.nz)
- * @author Eibe Frank (eibe@cs.waikato.ac.nz)
- * @version $Revision: 12037 $
+ * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class PIDdiscretize extends Filter implements SupervisedFilter, 
-	TechnicalInformationHandler, MOADiscretize{
+public class PIDdiscretize implements MOADiscretize{
 
-  /** for serialization */
-  static final long serialVersionUID = -3141006402280129097L;
+	/** Parameters */
+	  
+	protected int l2UpdateExamples = 10000;
+	/** The number of bins to divide the attribute into */
+	protected float alpha = 0.75f;	
 
-  /** Stores which columns to Discretize */
+	protected double min = 0;
+		
+	protected double max = 1;
+	
+	protected int initialBinsL1 = 500;
+  
+	protected int initialElements = 100;
+	
+  /** Stores which columns to Discretize */  
   protected Range m_DiscretizeCols = new Range();
 
-  /** The number of bins to divide the attribute into */
-  protected float alpha = 0.75f;
-  
   protected float totalCount = 0;
-
-  protected int minExamples = 1000;
-  
-  protected int l2UpdateExamples = 10000;
-  
-  /** The desired weight of instances per bin */
-  protected double m_DesiredWeightOfInstancesPerInterval = -1;
 
   /** Store the current cutpoints */  
   protected List<List<Double>> m_CutPointsL1 = null;
   
-  protected List<List<Integer>> m_Counts = null;
+  protected List<List<Float>> m_Counts = null;
   
-  protected List<List<Map<Integer, Integer>>> m_Distrib = null;
+  protected List<List<Map<Integer, Float>>> m_Distrib = null;
   
   protected double[][] m_CutPointsL2 = null;
   
-  protected int initialBinsL1 = 200;
-  
-  protected double min = 0.0;
-  
-  protected double max = 1.0;
-  
-  protected double step = -1.0;
+  protected double step;
 
   /** Output binary attributes for discretized attributes. */
   protected boolean m_MakeBinary = false;
@@ -154,70 +90,17 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 
   /** Constructor - initialises the filter */
   public PIDdiscretize() {
-
-    setAttributeIndices("first-last");
+	  setAttributeIndices("first-last");
   }
-
-  /**
-   * Returns the Capabilities of this filter.
-   * 
-   * @return the capabilities of this object
-   * @see Capabilities
-   */
-  @Override
-  public Capabilities getCapabilities() {
-    Capabilities result = super.getCapabilities();
-    result.disableAll();
-
-    // attributes
-    result.enableAllAttributes();
-    result.enable(Capability.MISSING_VALUES);
-
-    // class
-    result.enable(Capability.NOMINAL_CLASS);
-
-    return result;
-  }
-
-  /**
-   * Returns a string describing this filter
-   * 
-   * @return a description of the filter suitable for displaying in the
-   *         explorer/experimenter gui
-   */
-  public String globalInfo() {
-
-    return "An instance filter that discretizes a range of numeric"
-      + " attributes in the dataset into nominal attributes."
-      + " Discretization is by Fayyad & Irani's MDL method (the default).\n\n"
-      + "For more information, see:\n\n" + getTechnicalInformation().toString();
-  }
-
-  /**
-   * Returns an instance of a TechnicalInformation object, containing detailed
-   * information about the technical background of this class, e.g., paper
-   * reference or book this class is based on.
-   * 
-   * @return the technical information about this class
-   */
-  @Override
-  public TechnicalInformation getTechnicalInformation() {
-    TechnicalInformation result;
-
-    result = new TechnicalInformation(Type.INPROCEEDINGS);
-    result.setValue(Field.AUTHOR, "Usama M. Fayyad and Keki B. Irani");
-    result
-      .setValue(
-        Field.TITLE,
-        "Multi-interval discretization of continuousvalued attributes for classification learning");
-    result.setValue(Field.BOOKTITLE,
-      "Thirteenth International Joint Conference on Articial Intelligence");
-    result.setValue(Field.YEAR, "1993");
-    result.setValue(Field.VOLUME, "2");
-    result.setValue(Field.PAGES, "1022-1027");
-    result.setValue(Field.PUBLISHER, "Morgan Kaufmann Publishers");
-
-    return result;
+  
+  public PIDdiscretize(int initialElements, int initialBinsL1, int min, int max, int alpha, int l2UpdateExamples) {
+	  this();
+	  this.initialElements = initialElements;
+	  this.initialBinsL1 = initialBinsL1;
+	  this.min = min;
+	  this.max = max;
+	  this.alpha = alpha;
+	  this.l2UpdateExamples = l2UpdateExamples;
   }
   
   /**
@@ -226,7 +109,6 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
    * @return a string containing a comma separated list of ranges
    */
   public String getAttributeIndices() {
-
     return m_DiscretizeCols.getRanges();
   }
 
@@ -241,7 +123,6 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
    * @throws IllegalArgumentException if an invalid range list is supplied
    */
   public void setAttributeIndices(String rangeList) {
-
     m_DiscretizeCols.setRanges(rangeList);
   }
 
@@ -255,7 +136,6 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
    * @throws IllegalArgumentException if an invalid set of ranges is supplied
    */
   public void setAttributeIndicesArray(int[] attributes) {
-
     setAttributeIndices(Range.indicesToRangeList(attributes));
   }
 
@@ -271,35 +151,14 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 
     if (m_CutPointsL2 == null) {
       return null;
-    }
-    
+    }    
     return m_CutPointsL2[attributeIndex];
   }
   
-  private void initializeL1(Instance inst){
-	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
-	  step = (max - min) / (double) initialBinsL1;
-	  m_CutPointsL1 = new ArrayList<List<Double>>(inst.numAttributes());
-	  m_Counts = new ArrayList<List<Integer>>(inst.numAttributes());
-	  m_Distrib = new ArrayList<List<Map<Integer, Integer>>>(inst.numAttributes());
-	  for (int i = 0; i < inst.numAttributes(); i++) {
-		  Double[] initialb = new Double[initialBinsL1 + 1];
-		  Integer[] initialc = new Integer[initialBinsL1 + 1];
-		  List<Map<Integer, Integer>> initiald = new ArrayList<Map<Integer, Integer>>(initialBinsL1 + 1);
-		  
-		  for (int j = 0; j < initialBinsL1 + 1; j++) {
-			initialb[j] = min + j * step;
-			initialc[j] = 0;
-			initiald.add(new HashMap<Integer, Integer>());
-		  }
-		  m_CutPointsL1.add(new ArrayList<Double>(Arrays.asList(initialb)));
-		  m_Counts.add(new ArrayList<Integer>(Arrays.asList(initialc)));
-		  m_Distrib.add(initiald);			  
-	  }  
-  }
-  
   public Instance applyDiscretization(Instance inst) {
-	  return convertInstance(inst);
+	  if(m_CutPointsL1 != null)
+		  return convertInstance(inst);
+	  return inst;
   }
   
   
@@ -326,11 +185,33 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 	  	        && (instance.attribute(i).isNumeric())
 	  	        && (instance.classIndex() != i)) {
 	  	    	  //System.out.println(layer1toString(i));
-	  	    	  System.out.println(layer2toString(i));
+	  	    	  System.out.println(layertoString(m_CutPointsL2[i]));
 	  	    	  	    	  
 	  	      }
 	  	    }
   	  	}
+  }
+  
+  private void initializeL1(Instance inst){
+	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
+	  step = (max - min) / (double) initialBinsL1;
+	  m_CutPointsL1 = new ArrayList<List<Double>>(inst.numAttributes());
+	  m_Counts = new ArrayList<List<Float>>(inst.numAttributes());
+	  m_Distrib = new ArrayList<List<Map<Integer, Float>>>(inst.numAttributes());
+	  for (int i = 0; i < inst.numAttributes(); i++) {
+		  Double[] initialb = new Double[initialBinsL1 + 1];
+		  Float[] initialc = new Float[initialBinsL1 + 1];
+		  List<Map<Integer, Float>> initiald = new ArrayList<Map<Integer, Float>>(initialBinsL1 + 1);
+		  
+		  for (int j = 0; j < initialBinsL1 + 1; j++) {
+			initialb[j] = min + j * step;
+			initialc[j] = 0.f;
+			initiald.add(new HashMap<Integer, Float>());
+		  }
+		  m_CutPointsL1.add(new ArrayList<Double>(Arrays.asList(initialb)));
+		  m_Counts.add(new ArrayList<Float>(Arrays.asList(initialc)));
+		  m_Distrib.add(initiald);			  
+	  }  
   }
   
   private void updateLayer2(Instance instance) {
@@ -358,29 +239,27 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 	  int k = 0;
 	  if (!inst.isMissing(index)) {		  
 	        double x = inst.value(index);
-        	if(x < m_CutPointsL1.get(index).get(0)){
+        	if(x <= m_CutPointsL1.get(index).get(0)){
         		k = 0;
         	} else if(x > m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1)) {
         		k = m_CutPointsL1.get(index).size() - 1;
         	} else {
         		k = (int) Math.ceil((x - m_CutPointsL1.get(index).get(0)) / step);
-        		while(x < m_CutPointsL1.get(index).get(k - 1)) k -= 1;
-    	        while(x > m_CutPointsL1.get(index).get(k)) k += 1;
-    	        
+        		while(x <= m_CutPointsL1.get(index).get(k - 1)) k -= 1;
+    	        while(x > m_CutPointsL1.get(index).get(k)) k += 1;    	        
         	}
         	m_Counts.get(index).set(k, m_Counts.get(index).get(k) + 1);
-        	int nvalue = m_Distrib.get(index).get(k).getOrDefault((int) inst.classValue(), 0) + 1;
+        	float nvalue = m_Distrib.get(index).get(k).getOrDefault(inst.classValue(), 0.f) + 1;
         	m_Distrib.get(index).get(k).put((int) inst.classValue(), nvalue);	        
 	        totalCount += 1;
         	
         	// Launch the split process
-	        if(totalCount > minExamples && ((double) m_Counts.get(index).get(k)) / totalCount > alpha) {
-	        	System.out.println("Entra");
-	        	int tmp = m_Counts.get(index).get(k) / 2;
+	        if(totalCount > initialElements && ((double) m_Counts.get(index).get(k)) / totalCount > alpha) {
+	        	float tmp = m_Counts.get(index).get(k) / 2;
 	        	m_Counts.get(index).set(k, tmp);
-	        	Map<Integer, Integer> classDist = m_Distrib.get(index).get(k); 
-	        	Map<Integer, Integer> halfDistrib = new HashMap<Integer, Integer>();
-			    for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
+	        	Map<Integer, Float> classDist = m_Distrib.get(index).get(k); 
+	        	Map<Integer, Float> halfDistrib = new HashMap<Integer, Float>();
+			    for (Map.Entry<Integer, Float> entry : classDist.entrySet()){
 		    	  halfDistrib.put(entry.getKey(), entry.getValue() / 2);
 			    }
 			    m_Distrib.get(index).set(k, halfDistrib);
@@ -388,16 +267,16 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 	        	if(k == 0) {
 	        		m_CutPointsL1.get(index).add(0, m_CutPointsL1.get(index).get(0) - step);
 	        		m_Counts.get(index).add(0, tmp);
-	        		m_Distrib.get(index).add(0, new HashMap<Integer,Integer>(halfDistrib));
+	        		m_Distrib.get(index).add(0, new HashMap<Integer,Float>(halfDistrib));
 	        	} else if(k > m_CutPointsL1.get(index).size()) {
 	        		m_CutPointsL1.get(index).add(m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1) + step);
 	        		m_Counts.get(index).add(tmp);
-	        		m_Distrib.get(index).add(new HashMap<Integer,Integer>(halfDistrib));
+	        		m_Distrib.get(index).add(new HashMap<Integer,Float>(halfDistrib));
 	        	} else {
 	        		double nBreak = m_CutPointsL1.get(index).get(k) + m_CutPointsL1.get(index).get(k + 1) / 2;
 	        		m_CutPointsL1.get(index).add(k, nBreak); // Important to use add function
 	        		m_Counts.get(index).add(k, tmp);
-	        		m_Distrib.get(index).add(k, new HashMap<Integer,Integer>(halfDistrib));
+	        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
 	        	}
 	        }
 	        
@@ -412,13 +291,13 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
    * @return the bin ranges string (or null if the attribute requested has been
    *         discretized into only one interval.)
    */
-  public String layer2toString(int attributeIndex) {
+  private String layertoString(double[] cutPoints) {
 
-    if (m_CutPointsL2 == null) {
+    /*if (m_CutPointsL2 == null) {
       return null;
     }
 
-    double[] cutPoints = m_CutPointsL2[attributeIndex];
+    double[] cutPoints = m_CutPointsL2[attributeIndex];*/
 
     if (cutPoints == null) {
       return "All";
@@ -439,33 +318,6 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
 
     return sb.toString();
   }
-  
-  public String layer1toString(int attributeIndex) {
-
-	    if (m_CutPointsL1 == null) {
-	      return null;
-	    }
-
-	    double[] cutPoints = new double[m_CutPointsL1.get(attributeIndex).size()];
-	    for (int i = 0; i < m_CutPointsL1.get(attributeIndex).size(); i++) {
-			cutPoints[i] = m_CutPointsL1.get(attributeIndex).get(i);
-		}
-
-	    StringBuilder sb = new StringBuilder();
-	    boolean first = true;
-
-	    for (int j = 0, n = cutPoints.length; j <= n; ++j) {
-	      if (first) {
-	        first = false;
-	      } else {
-	        sb.append(',');
-	      }
-
-	      sb.append(binRangeString(cutPoints, j, m_BinRangePrecision));
-	    }
-
-	    return sb.toString();
-	  }
 
   /**
    * Get a bin range string for a specified bin of some attribute's cut points.
@@ -550,138 +402,137 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
     return (gain > (Utils.log2(numCutPoints) + delta) / numInstances);
   }
   
-  private double[] cutPointsForSubset(int attIndex,
-		    int first, int lastPlusOne) {
+  private double[] cutPointsForSubset(int attIndex, int first, int lastPlusOne) {
 
-		    //Map<Integer, Double> counts, bestCounts;
-		    double[] left, right, cutPoints;
-		    //double step = ((float) totalCount) / m_CutPointsL1.get(index).size();
-		    double currentCutPoint = -Double.MAX_VALUE, bestCutPoint = -1, currentEntropy, bestEntropy, priorEntropy, gain;
-		    int bestIndex = -1, numCutPoints = 0;
-		    double numInstances = 0;
+	    //Map<Integer, Double> counts, bestCounts;
+	    double[] left, right, cutPoints;
+	    //double step = ((float) totalCount) / m_CutPointsL1.get(index).size();
+	    double currentCutPoint = -Double.MAX_VALUE, bestCutPoint = -1, currentEntropy, bestEntropy, priorEntropy, gain;
+	    int bestIndex = -1, numCutPoints = 0;
+	    double numInstances = 0;
 
-		    // Compute number of instances in set
-		    if ((lastPlusOne - first) < 2) {
-		      return null;
+	    // Compute number of instances in set
+	    if ((lastPlusOne - first) < 2) {
+	      return null;
+	    }
+	    
+	    // Get the greatest class observed till here
+	    int numClasses = 0;
+	    for (int i = first; i < lastPlusOne; i++) {
+	    	Map<Integer, Float> classDist = m_Distrib.get(attIndex).get(i); 
+	    	for (Integer key : classDist.keySet()){
+	    		if(key > numClasses) {
+	    			numClasses = key;
+	    		}
+      		}
+	    }
+	    numClasses += 1;
+
+	    // Compute class counts.
+	    double[][] counts = new double[2][numClasses];
+	    for (int i = first; i < lastPlusOne; i++) {
+	    	Map<Integer, Float> classDist = m_Distrib.get(attIndex).get(i); 
+		    for (Map.Entry<Integer, Float> entry : classDist.entrySet()){
+	    	  counts[1][entry.getKey()] += entry.getValue();
+	          numInstances += entry.getValue();
 		    }
-		    
-		    // Get the greatest class observed till here
-		    int numClasses = 0;
-		    for (int i = first; i < lastPlusOne; i++) {
-		    	Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
-		    	for (Integer key : classDist.keySet()){
-		    		if(key > numClasses) {
-		    			numClasses = key;
-		    		}
-	      		}
-		    }
-		    numClasses += 1;
+	    }
+	    
+	    // Save prior counts
+	    double[] priorCounts = new double[numClasses];
+	    System.arraycopy(counts[1], 0, priorCounts, 0, numClasses);
 
-		    // Compute class counts.
-		    double[][] counts = new double[2][numClasses];
-		    for (int i = first; i < lastPlusOne; i++) {
-		    	Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
-			    for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
-		    	  counts[1][entry.getKey()] += entry.getValue();
-		          numInstances += entry.getValue();
-			    }
-		    }
-		    
-		    // Save prior counts
-		    double[] priorCounts = new double[numClasses];
-		    System.arraycopy(counts[1], 0, priorCounts, 0, numClasses);
+	    // Entropy of the full set
+	    priorEntropy = ContingencyTables.entropy(priorCounts);
+	    bestEntropy = priorEntropy;
+	    
+	    // Compute class counts.
+	    /*counts = new HashMap<Integer, Double>();
+	    for (int i = first; i < lastPlusOne; i++) {
+	      
+	      Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
+	      for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
+	    	  double c = counts.getOrDefault(entry.getKey(), 0.0) + entry.getValue();
+	          counts.put(entry.getKey(), c);
+	          numInstances += c;
+	      }
+	    }*/
 
-		    // Entropy of the full set
-		    priorEntropy = ContingencyTables.entropy(priorCounts);
-		    bestEntropy = priorEntropy;
-		    
-		    // Compute class counts.
-		    /*counts = new HashMap<Integer, Double>();
-		    for (int i = first; i < lastPlusOne; i++) {
-		      
-		      Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
-		      for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
-		    	  double c = counts.getOrDefault(entry.getKey(), 0.0) + entry.getValue();
-		          counts.put(entry.getKey(), c);
-		          numInstances += c;
-		      }
-		    }*/
+	    // Entropy of the full set
+	    
+	    /*Double[] priorCounts = counts.values().toArray(new Double[counts.size()]);
+	    double[] prior = new double[counts.size()];
+	    for (int i = 0; i < counts.size(); i++) {
+	    	prior[i] = priorCounts[i];
+	    }*/
+	    
+	    priorEntropy = ContingencyTables.entropy(priorCounts);
+	    bestEntropy = priorEntropy;
 
-		    // Entropy of the full set
-		    
-		    /*Double[] priorCounts = counts.values().toArray(new Double[counts.size()]);
-		    double[] prior = new double[counts.size()];
-		    for (int i = 0; i < counts.size(); i++) {
-		    	prior[i] = priorCounts[i];
-		    }*/
-		    
-		    priorEntropy = ContingencyTables.entropy(priorCounts);
-		    bestEntropy = priorEntropy;
+	    // Find best entropy.
+	    double[][] bestCounts = new double[2][numClasses];
+	    for (int i = first; i < (lastPlusOne - 1); i++) {
+	    	Map<Integer, Float> classDist = m_Distrib.get(attIndex).get(i); 
+	    	for (Map.Entry<Integer, Float> entry : classDist.entrySet()){
+	    		counts[0][entry.getKey()] += entry.getValue();
+	    		counts[1][entry.getKey()] -= entry.getValue();
+	    	}		
+	    	currentCutPoint = m_CutPointsL1.get(attIndex).get(i);
+	    	currentEntropy = ContingencyTables.entropyConditionedOnRows(counts);
+	        if (currentEntropy < bestEntropy) {
+	          bestCutPoint = currentCutPoint;
+	          bestEntropy = currentEntropy;
+	          bestIndex = i;
+	          System.arraycopy(counts[0], 0, bestCounts[0], 0, numClasses);
+	          System.arraycopy(counts[1], 0, bestCounts[1], 0, numClasses);
+	        }
+	        numCutPoints++;
+	    }
 
-		    // Find best entropy.
-		    double[][] bestCounts = new double[2][numClasses];
-		    for (int i = first; i < (lastPlusOne - 1); i++) {
-		    	Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
-		    	for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
-		    		counts[0][entry.getKey()] += entry.getValue();
-		    		counts[1][entry.getKey()] -= entry.getValue();
-		    	}		
-		    	currentCutPoint = m_CutPointsL1.get(attIndex).get(i);
-		    	currentEntropy = ContingencyTables.entropyConditionedOnRows(counts);
-  		        if (currentEntropy < bestEntropy) {
-  		          bestCutPoint = currentCutPoint;
-  		          bestEntropy = currentEntropy;
-  		          bestIndex = i;
-  		          System.arraycopy(counts[0], 0, bestCounts[0], 0, numClasses);
-  		          System.arraycopy(counts[1], 0, bestCounts[1], 0, numClasses);
-  		        }
-  		        numCutPoints++;
-		    }
+	    // Use worse encoding?
+	    if (!m_UseBetterEncoding) {
+	      numCutPoints = (lastPlusOne - first) - 1;
+	    }
 
-		    // Use worse encoding?
-		    if (!m_UseBetterEncoding) {
-		      numCutPoints = (lastPlusOne - first) - 1;
-		    }
+	    // Checks if gain is zero
+	    gain = priorEntropy - bestEntropy;
+	    
+	    if (gain <= 0) {
+	      return null;
+	    }
 
-		    // Checks if gain is zero
-		    gain = priorEntropy - bestEntropy;
-		    
-		    if (gain <= 0) {
-		      return null;
-		    }
+	    // Check if split is to be accepted
+	    if (FayyadAndIranisMDL(priorCounts, bestCounts,
+	        numInstances, numCutPoints)) {
 
-		    // Check if split is to be accepted
-		    if (FayyadAndIranisMDL(priorCounts, bestCounts,
-		        numInstances, numCutPoints)) {
+	      // Select split points for the left and right subsets
+	      left = cutPointsForSubset(attIndex, first, bestIndex + 1);
+	      right = cutPointsForSubset(attIndex, bestIndex + 1,
+	        lastPlusOne);
 
-		      // Select split points for the left and right subsets
-		      left = cutPointsForSubset(attIndex, first, bestIndex + 1);
-		      right = cutPointsForSubset(attIndex, bestIndex + 1,
-		        lastPlusOne);
+	      // Merge cutpoints and return them
+	      if ((left == null) && (right) == null) {
+	        cutPoints = new double[1];
+	        cutPoints[0] = bestCutPoint;
+	      } else if (right == null) {
+	        cutPoints = new double[left.length + 1];
+	        System.arraycopy(left, 0, cutPoints, 0, left.length);
+	        cutPoints[left.length] = bestCutPoint;
+	      } else if (left == null) {
+	        cutPoints = new double[1 + right.length];
+	        cutPoints[0] = bestCutPoint;
+	        System.arraycopy(right, 0, cutPoints, 1, right.length);
+	      } else {
+	        cutPoints = new double[left.length + right.length + 1];
+	        System.arraycopy(left, 0, cutPoints, 0, left.length);
+	        cutPoints[left.length] = bestCutPoint;
+	        System.arraycopy(right, 0, cutPoints, left.length + 1, right.length);
+	      }
 
-		      // Merge cutpoints and return them
-		      if ((left == null) && (right) == null) {
-		        cutPoints = new double[1];
-		        cutPoints[0] = bestCutPoint;
-		      } else if (right == null) {
-		        cutPoints = new double[left.length + 1];
-		        System.arraycopy(left, 0, cutPoints, 0, left.length);
-		        cutPoints[left.length] = bestCutPoint;
-		      } else if (left == null) {
-		        cutPoints = new double[1 + right.length];
-		        cutPoints[0] = bestCutPoint;
-		        System.arraycopy(right, 0, cutPoints, 1, right.length);
-		      } else {
-		        cutPoints = new double[left.length + right.length + 1];
-		        System.arraycopy(left, 0, cutPoints, 0, left.length);
-		        cutPoints[left.length] = bestCutPoint;
-		        System.arraycopy(right, 0, cutPoints, left.length + 1, right.length);
-		      }
-
-		      return cutPoints;
-		    } else {
-		      return null;
-		    }
+	      return cutPoints;
+	    } else {
+	      return null;
+	    }
   	}
   
   /**
@@ -745,39 +596,8 @@ public class PIDdiscretize extends Filter implements SupervisedFilter,
         index++;
       }
     }
-
-    /*Instance inst = null;
-    if (instance instanceof SparseInstance) {
-      inst = new SparseInstance(instance.weight(), vals);
-    } else {
-      inst = new DenseInstance(instance.weight(), vals);
-    }
-
-    copyValues(inst, false, instance.dataset(), outputFormatPeek());
-    */
-    //push(inst); // No need to copy instance
     
     return(instance);
   }
-
-  /**
-   * Returns the revision string.
-   * 
-   * @return the revision
-   */
-  @Override
-  public String getRevision() {
-    return RevisionUtils.extract("$Revision: 12037 $");
-  }
-
-  /**
-   * Main method for testing this class.
-   * 
-   * @param argv should contain arguments to the filter: use -h for help
-   */
-  public static void main(String[] argv) {
-    runFilter(new PIDdiscretize(), argv);
-  }
-
 
 }

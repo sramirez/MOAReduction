@@ -88,6 +88,7 @@ public class IFFDdiscretize extends Discretize
         
         return super.setInputFormat(instanceInfo);
     }
+    
     protected void calculateCutPoints() {
         int numAttributes=getInputFormat().numAttributes();
         m_InstanceNum=getInputFormat().numInstances();

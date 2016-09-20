@@ -54,10 +54,11 @@ public class PIDdiscretize implements MOADiscretize{
 
 	protected double min = 0;
 		
-	protected double max = 1;
+	protected double max = 3;
 	
 	protected int initialBinsL1 = 500;
   
+	/** Instance limit before starting the splitting process */
 	protected int initialElements = 100;
 	
   /** Stores which columns to Discretize */  
@@ -167,29 +168,29 @@ public class PIDdiscretize implements MOADiscretize{
 	  if(m_CutPointsL1 == null) {
 		  initializeL1(instance);
 	  }
+	  
+	  totalCount++;
 		  
-	    for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-	      if ((m_DiscretizeCols.isInRange(i))
-	        && (instance.attribute(i).isNumeric())
-	        && (instance.classIndex() != i)) {
-	    	  updateLayer1(instance, i);
-	    	  
-	      }
-	    }
-	    
-	    if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
-  		  updateLayer2(instance);
-    	  System.out.println("New layer 2\n\n");
-	  		for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-	  	      if ((m_DiscretizeCols.isInRange(i))
-	  	        && (instance.attribute(i).isNumeric())
-	  	        && (instance.classIndex() != i)) {
-	  	    	  //System.out.println(layer1toString(i));
-	  	    	  System.out.println(layertoString(m_CutPointsL2[i]));
-	  	    	  	    	  
-	  	      }
-	  	    }
-  	  	}
+	  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
+		  if ((m_DiscretizeCols.isInRange(i))
+				  && (instance.attribute(i).isNumeric())
+				  && (instance.classIndex() != i)) {
+			  updateLayer1(instance, i);
+    	  
+		  }
+	  }
+    
+	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
+		  updateLayer2(instance);
+		  System.out.println("New layer 2\n\n");	  
+		  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
+  	      if ((m_DiscretizeCols.isInRange(i))
+  	        && (instance.attribute(i).isNumeric())
+  	        && (instance.classIndex() != i)) {
+  	    	  //System.out.println(layertoString(m_CutPointsL2[i]));  	    	  	    	  
+  	      }
+  	    }
+	  }
   }
   
   private void initializeL1(Instance inst){
@@ -249,12 +250,12 @@ public class PIDdiscretize implements MOADiscretize{
     	        while(x > m_CutPointsL1.get(index).get(k)) k += 1;    	        
         	}
         	m_Counts.get(index).set(k, m_Counts.get(index).get(k) + 1);
-        	float nvalue = m_Distrib.get(index).get(k).getOrDefault(inst.classValue(), 0.f) + 1;
-        	m_Distrib.get(index).get(k).put((int) inst.classValue(), nvalue);	        
-	        totalCount += 1;
+        	float nvalue = m_Distrib.get(index).get(k).getOrDefault((int) inst.classValue(), 0.f) + 1;
+        	m_Distrib.get(index).get(k).put((int) inst.classValue(), nvalue);
         	
         	// Launch the split process
-	        if(totalCount > initialElements && ((double) m_Counts.get(index).get(k)) / totalCount > alpha) {
+	        double prop = ((double) m_Counts.get(index).get(k)) / totalCount;
+	        if(totalCount > initialElements && prop > alpha) {
 	        	float tmp = m_Counts.get(index).get(k) / 2;
 	        	m_Counts.get(index).set(k, tmp);
 	        	Map<Integer, Float> classDist = m_Distrib.get(index).get(k); 
@@ -268,14 +269,14 @@ public class PIDdiscretize implements MOADiscretize{
 	        		m_CutPointsL1.get(index).add(0, m_CutPointsL1.get(index).get(0) - step);
 	        		m_Counts.get(index).add(0, tmp);
 	        		m_Distrib.get(index).add(0, new HashMap<Integer,Float>(halfDistrib));
-	        	} else if(k > m_CutPointsL1.get(index).size()) {
+	        	} else if(k >= m_CutPointsL1.get(index).size() - 1) {
 	        		m_CutPointsL1.get(index).add(m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1) + step);
 	        		m_Counts.get(index).add(tmp);
 	        		m_Distrib.get(index).add(new HashMap<Integer,Float>(halfDistrib));
 	        	} else {
-	        		double nBreak = m_CutPointsL1.get(index).get(k) + m_CutPointsL1.get(index).get(k + 1) / 2;
-	        		m_CutPointsL1.get(index).add(k, nBreak); // Important to use add function
-	        		m_Counts.get(index).add(k, tmp);
+	        		double nBreak = (m_CutPointsL1.get(index).get(k) + m_CutPointsL1.get(index).get(k + 1)) / 2;
+	        		m_CutPointsL1.get(index).add(k + 1, nBreak); // Important to use add function
+	        		m_Counts.get(index).add(k + 1, tmp);
 	        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
 	        	}
 	        }

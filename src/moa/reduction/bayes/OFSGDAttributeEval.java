@@ -85,6 +85,7 @@ public class OFSGDAttributeEval extends ASEvaluation implements
   static final double eta = 0.2; // According to authors' criterion  
   static final double lambda = 0.01; // According to authors' criterion  
   private int numFeatures = 10;
+  private boolean updated = false;
 
   /**
    * Returns a string describing this attribute evaluator
@@ -215,13 +216,15 @@ public class OFSGDAttributeEval extends ASEvaluation implements
 	  				weights.setElement(array[i].index, 0);
 	  		}
 	  	}
+	  	updated = true;
   }
 
 
 	@Override
 	public void applySelection() {
 		// TODO Auto-generated method stub
-		System.out.println("Weight values: " + Arrays.toString(weights.getElements()));		
+		//System.out.println("Weight values: " + Arrays.toString(weights.getElements()));		
+	  	updated = false;
 	}
 
   /**
@@ -301,5 +304,11 @@ public class OFSGDAttributeEval extends ASEvaluation implements
 	// TODO Auto-generated method stub
 	
 	}
+
+@Override
+public boolean isUpdated() {
+	// TODO Auto-generated method stub
+	return updated;
+}
 
 }

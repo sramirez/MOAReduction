@@ -54,7 +54,7 @@ public class IFFDdiscretize extends Discretize
 	
 	private static final long serialVersionUID = 1L;
 	/** number of discrete values in each bin (default is 30) */
-    protected int m_BinSize = 45;
+    //protected int m_BinSize = 45;
     protected int m_MinBinSize=30;
     protected int m_MaxBinSize=60;
     
@@ -71,9 +71,24 @@ public class IFFDdiscretize extends Discretize
     /** Store frequency of every interval of every attribute*/
     protected int [][] m_IntervalFrequency=null;
     
-    /* update the discretization if there is some interval split,return true, else return false*/
+    public IFFDdiscretize() {
+		// TODO Auto-generated constructor stub
+	}
+    
+    public IFFDdiscretize(int minSize, int maxSize) {
+		// TODO Auto-generated constructor stub
+    	m_MinBinSize = minSize;
+    	m_MaxBinSize = maxSize;
+	}
+    
+    /**
+     * Update the discretization scheme using the new instance values.
+     * It also initializes all variables if it is the first update.
+     * 
+     * @param instance the instance to consider
+     */
     public void updateEvaluator(Instance instance) {
-    	m_DiscretizeCols.setUpper(instance.numAttributes() - 1);
+    	
     	if(m_AttributeClassPairs == null) {
     		m_DiscretizeCols.setUpper(instance.numAttributes() - 1);
     		//setAttributeIndices("first-last");
@@ -110,6 +125,11 @@ public class IFFDdiscretize extends Discretize
         }        
     }
     
+    /**
+     * Apply to the instance the discretization scheme derived from previous updates.
+     *  
+     * @param instance instance to discretize
+     */
     public Instance applyDiscretization(Instance inst) {
     	if(m_CutPoints != null)
     		return convertInstance2(inst);
@@ -180,7 +200,12 @@ public class IFFDdiscretize extends Discretize
       return(instance);
     }
 
-    
+    /**
+     * Update the discretization scheme using the new instance. 
+     * It makes several calls to the splitInterval function.
+     * 
+     * @param instance the instance to consider
+     */
     protected void updateCutpoints(Instance instance) {
         /* PD setting begin*/
         /*
@@ -247,6 +272,13 @@ public class IFFDdiscretize extends Discretize
         
     }
     
+    /**
+     * Split the given interval into two equal-size intervals.
+     * It also update the distribution variables.
+     * 
+     * @param index Attribute index
+     * @param splitinterval Interval index in the class attribute pairs.
+     */
     protected void splitInterval(int index,int splitinterval) {
         double newcutpoint=0;
         int i,j;

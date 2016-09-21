@@ -46,8 +46,7 @@ import weka.core.Utils;
  */
 public class PIDdiscretize implements MOADiscretize{
 
-	/** Parameters */
-	  
+	/** Parameters */	  
 	protected int l2UpdateExamples = 10000;
 	/** The number of bins to divide the attribute into */
 	protected float alpha = 0.75f;	
@@ -182,7 +181,7 @@ public class PIDdiscretize implements MOADiscretize{
     
 	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
 		  updateLayer2(instance);
-		  System.out.println("New layer 2\n\n");	  
+		  //System.out.println("New layer 2\n\n");	  
 		  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
   	      if ((m_DiscretizeCols.isInRange(i))
   	        && (instance.attribute(i).isNumeric())

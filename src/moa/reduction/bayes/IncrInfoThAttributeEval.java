@@ -115,8 +115,7 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
    * Constructor
    */
   public IncrInfoThAttributeEval() {
-    resetOptions();
-    
+    resetOptions();    
   }
   
   public IncrInfoThAttributeEval(int method) {
@@ -124,6 +123,11 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
 	    resetOptions();
 	    
   }
+	@Override
+	public boolean isUpdated() {
+		// TODO Auto-generated method stub
+		return updated;
+	}
 
   /**
    * Returns the tip text for this property
@@ -217,61 +221,43 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
   @Override
   public void buildEvaluator(Instances data) throws Exception {}
   
+  /**
+   * Updates an information gain attribute evaluator. Discretizes all
+   * attributes that are numeric.
+   * 
+   * @param data set of instances serving as training data
+   * @throws Exception if the evaluator has not been generated successfully
+   */
   public void updateEvaluator(Instance inst) throws Exception {
 	  
-	  	if(counts == null) {
-		    // can evaluator handle data?	  
-		  	ArrayList<Attribute> list = Collections.list(inst.enumerateAttributes());
-		  	list.add(inst.classAttribute());
-		  	Instances data = new Instances("single", list, 1);
-		  	data.setClassIndex(inst.classIndex());
-		  	data.add(inst);
-		    getCapabilities().testWithFail(data);
-		    classIndex = inst.classIndex();
-		    counts = (HashMap<Key, Float>[]) new HashMap[inst.numAttributes()];
-		    for(int i = 0; i < counts.length; i++) counts[i] = new HashMap<Key, Float>();
-	  	}
-	    
-	    //Instance inst = data.firstInstance();
-	    //int numClasses = inst.attribute(classIndex).numValues();
-
-	    		//...
-
-	    		
-	    // Get counts
-	    //for (int k = 0; k < numInstances; k++) {
-	      //Instance inst = data.instance(k);
-	      for (int i = 0; i < inst.numValues(); i++) {
-	        if (inst.index(i) != classIndex) {
-	          /*if (inst.isMissingSparse(i) || inst.classIsMissing()) {
-	            if (!inst.isMissingSparse(i)) {
-	            	counts[inst.index(i)][(int) inst.valueSparse(i)][numClasses] += inst.weight();
-	            	//counts[inst.index(i)][0][numClasses] -= inst.weight();
-	            } else if (!inst.classIsMissing()) {
-	              counts[inst.index(i)][inst.attribute(inst.index(i)).numValues()][(int) inst
-	                .classValue()] += inst.weight();
-	              counts[inst.index(i)][0][(int) inst.classValue()] -= inst
-	                .weight();
-	            } else {
-	              counts[inst.index(i)][inst.attribute(inst.index(i)).numValues()][numClasses] += inst
-	                .weight();
-	              counts[inst.index(i)][0][numClasses] -= inst.weight();
-	            }
-	          } else {*/
-	        	Key key = new Key((float) inst.valueSparse(i), (float) inst.classValue());
-	        	Float cval = (float) (counts[inst.index(i)].getOrDefault(key, 0.0f) + inst.weight());
-	        	counts[inst.index(i)].put(key, cval);
-	        	
-	        	//counts[inst.index(i)][(int) inst.valueSparse(i)][(int) inst.classValue()] += inst.weight();
-	            //counts[inst.index(i)][0][(int) inst.classValue()] -= inst.weight();
-	          //}
-	        }
-	      }
-	      
-	      updated = true;
+  	if(counts == null) {
+	    // can evaluator handle data?	  
+	  	ArrayList<Attribute> list = Collections.list(inst.enumerateAttributes());
+	  	list.add(inst.classAttribute());
+	  	Instances data = new Instances("single", list, 1);
+	  	data.setClassIndex(inst.classIndex());
+	  	data.add(inst);
+	    getCapabilities().testWithFail(data);
+	    classIndex = inst.classIndex();
+	    counts = (HashMap<Key, Float>[]) new HashMap[inst.numAttributes()];
+	    for(int i = 0; i < counts.length; i++) counts[i] = new HashMap<Key, Float>();
+  	}
+      for (int i = 0; i < inst.numValues(); i++) {
+        if (inst.index(i) != classIndex) {
+        	Key key = new Key((float) inst.valueSparse(i), (float) inst.classValue());
+        	Float cval = (float) (counts[inst.index(i)].getOrDefault(key, 0.0f) + inst.weight());
+        	counts[inst.index(i)].put(key, cval);
+        }
+      }
+      
+      updated = true;
   }
   
   @Override
+  /**
+   * Update the contingency tables and the rankings for each features using the counters.
+   * Counters are updated in each iteration.
+   */
   public void applySelection(){
 	  if(counts != null && updated) {
 		  m_InfoValues = new double[counts.length];
@@ -318,11 +304,11 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
 					m_InfoValues[i] = (ContingencyTables.entropyOverColumns(lcounts) - ContingencyTables
 					          .entropyConditionedOnRows(lcounts));
 					break;
-				}
-	            updated = false;		        
+				}		        
 		      }
 		    }
-		    System.out.println("Attribute values: " + Arrays.toString(m_InfoValues));
+		    //System.out.println("Attribute values: " + Arrays.toString(m_InfoValues));
+            updated = false;
 	  }
   }
 

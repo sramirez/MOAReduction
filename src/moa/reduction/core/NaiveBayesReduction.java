@@ -73,16 +73,21 @@ public class NaiveBayesReduction extends AbstractClassifier {
     protected static AttributeSelection selector = null;
     protected AutoExpandVector<AttributeClassObserver> attributeObservers;
 
-    public static IntOption numFeaturesOption = new IntOption("numFeatures", 'f', "The number of features to select", 1, 1, Integer.MAX_VALUE);
-    public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', "Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
-    public static IntOption discmethodOption = new IntOption("discMethod", 'd', "Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
+    public static IntOption numFeaturesOption = new IntOption("numFeatures", 'f', 
+    		"The number of features to select", 25, 1, Integer.MAX_VALUE);
+    public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
+    		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 1, 0, 3);
+    public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 0, 0, 3);
+    public static IntOption winSizeOption = new IntOption("winSize", 'w', 
+    		"Window size for model updates", 1000, 1, Integer.MAX_VALUE);    
+    
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
-    
-    private static boolean updated = false;
+    protected int totalCount = 0;
     
     public NaiveBayesReduction () {    	
-    	if(fsmethodOption.getValue() == 2) {
+    	if(fsmethodOption.getValue() == 3) {
     		fselector = new OFSGDAttributeEval(numFeaturesOption.getValue());
     	} else if (fsmethodOption.getValue() == 2 || fsmethodOption.getValue() == 1){
     		fselector = new IncrInfoThAttributeEval(fsmethodOption.getValue());
@@ -119,7 +124,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
 	    	
     	if(discmethodOption.getValue() != 0) 
     		discretizer.updateEvaluator(rinst);
-    	updated = true;
     	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
@@ -132,6 +136,8 @@ public class NaiveBayesReduction extends AbstractClassifier {
             }
             obs.observeAttributeClass(rinst.value(instAttIndex), (int) rinst.classValue(), rinst.weight());
         }
+        
+        totalCount++;
     }
 
     @Override
@@ -184,42 +190,45 @@ public class NaiveBayesReduction extends AbstractClassifier {
         return new GaussianNumericAttributeClassObserver();
     }
     
-    private static Instance performFS(Instance rinst) {
+    private Instance performFS(Instance rinst) {
     	// Feature selection process performed before
     	Instance sinst = rinst;
-		if(updated || selector == null) {
-	    	fselector.applySelection();
-			selector = new AttributeSelection();
-			Ranker ranker = new Ranker();
-			ranker.setNumToSelect(Math.min(numFeaturesOption.getValue(), rinst.numAttributes() - 1));
-			selector.setEvaluator((ASEvaluation) fselector);
-			selector.setSearch(ranker);
-			ArrayList<Attribute> list = Collections.list(rinst.enumerateAttributes());
-			list.add(rinst.classAttribute());
-		  	Instances single = new Instances("single", list, 1);
-		  	single.setClassIndex(rinst.classIndex());
-		  	single.add(rinst);
-		  	try {
-				selector.SelectAttributes(single);
-				System.out.println("Selected features: " + selector.toResultsString());
+		if(fselector != null) {
+			if(fselector.isUpdated() && totalCount % winSizeOption.getValue() == 0) {
+		    	fselector.applySelection();
+				selector = new AttributeSelection();
+				Ranker ranker = new Ranker();
+				ranker.setNumToSelect(Math.min(numFeaturesOption.getValue(), rinst.numAttributes() - 1));
+				selector.setEvaluator((ASEvaluation) fselector);
+				selector.setSearch(ranker);
+				ArrayList<Attribute> list = Collections.list(rinst.enumerateAttributes());
+				list.add(rinst.classAttribute());
+			  	Instances single = new Instances("single", list, 1);
+			  	single.setClassIndex(rinst.classIndex());
+			  	single.add(rinst);
+			  	try {
+					selector.SelectAttributes(single);
+					System.out.println("Selected features: " + selector.toResultsString());
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+    	}    		
+		
+		if(selector != null) {
+			try {
+				sinst = selector.reduceDimensionality(rinst);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-    	}    		
-		
-		try {
-			sinst = selector.reduceDimensionality(rinst);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
-		updated = false;
     	
     	return sinst;
     }
 
-    public static double[] doNaiveBayesPrediction(weka.core.Instance inst,
+    public double[] doNaiveBayesPrediction(weka.core.Instance inst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> attributeObservers) {
     	
@@ -248,7 +257,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     // Naive Bayes Prediction using log10 for VFDR rules 
-    public static double[] doNaiveBayesPredictionLog(weka.core.Instance rinst,
+    public double[] doNaiveBayesPredictionLog(weka.core.Instance rinst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
     	

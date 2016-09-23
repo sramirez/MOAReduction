@@ -41,7 +41,7 @@ public abstract class MaintainedCB extends AbstractClassifier {
 	public IntOption kOption = new IntOption("neighbors", 'k',
             "Number of neighbors used in search.", 5, 1, Integer.MAX_VALUE);
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 250, 1, Integer.MAX_VALUE);
+            "Size of the environments.", 100, 1, Integer.MAX_VALUE);
 
     protected long index;
     protected boolean initialized = false;

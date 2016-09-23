@@ -5,6 +5,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import moa.classifiers.AbstractClassifier;
+import moa.classifiers.lazy.kNN;
 import moa.core.Measurement;
 import moa.options.ClassOption;
 import moa.options.FloatOption;
@@ -29,10 +30,10 @@ import weka.core.Instances;
 public class FISH extends AbstractClassifier {
 
     public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
-            "Classifier to train.", Classifier.class, "bayes.NaiveBayes");
+            "Classifier to train.", Classifier.class, "lazy.IBk");
 
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 200, 100, Integer.MAX_VALUE);
+            "Size of the environments.", 100, 100, Integer.MAX_VALUE);
 
     public FloatOption distancePropOption = new FloatOption(
             "distanceProportion",
@@ -57,6 +58,9 @@ public class FISH extends AbstractClassifier {
         this.distanceProp = this.distancePropOption.getValue();
         this.k = this.kOption.getValue();
         this.testClassifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
+		if(testClassifier instanceof kNN){
+			((kNN) testClassifier).kOption.setValue(kOption.getValue());
+		}
     }
 
     @Override
@@ -115,6 +119,9 @@ public class FISH extends AbstractClassifier {
     	if (this.index >= this.periodOption.getValue()) {
         	// The specified size is gotten, now the online process is started
             Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
+    		if(classifier instanceof kNN){
+    			((kNN) classifier).kOption.setValue(kOption.getValue());
+    		}
             
             // Compute distances (space/time)
             float[] space = new float[buffer.size()];
@@ -161,9 +168,10 @@ public class FISH extends AbstractClassifier {
 		            	// Validation instance is removed from the training set for this run
 	            		Instance removed = instancestr.remove(j);
 	            		// Train for the tuple i, j
+	            			
 	            		classifier.buildClassifier(instancestr);
 		            	
-	                	//validate on instance j (from val set)
+	                	// validate on instance j (from val set)
 	            		int pred = (int) classifier.classifyInstance(removed);
 	            		if (pred != removed.classValue()) 
 							errors++;

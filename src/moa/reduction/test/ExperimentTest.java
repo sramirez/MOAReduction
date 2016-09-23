@@ -5,6 +5,7 @@ import java.io.IOException;
 import moa.classifiers.Classifier;
 import moa.classifiers.competence.NEFCSSRR;
 import moa.classifiers.meta.FISH;
+import moa.classifiers.meta.LearnNSE;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesReduction;
 import moa.streams.ArffFileStream;
@@ -18,9 +19,10 @@ public class ExperimentTest {
         }
 
         public void run(int numInstances, boolean isTesting){
-                Classifier learner = new NaiveBayesReduction();
+                Classifier learner = new LearnNSE();
                 
                 RandomRBFGenerator stream = new RandomRBFGenerator();
+                //stream.numAttsOption.setValue(1000);
                 stream.prepareForUse();
 
                 learner.setModelContext(stream.getHeader());
@@ -46,6 +48,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(1000000, true);
+                exp.run(10000, true);
         }
 }

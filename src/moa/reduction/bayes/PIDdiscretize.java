@@ -53,12 +53,12 @@ public class PIDdiscretize implements MOADiscretize{
 
 	protected double min = 0;
 		
-	protected double max = 3;
+	protected double max = 1;
 	
-	protected int initialBinsL1 = 500;
+	protected int initialBinsL1 = 200;
   
 	/** Instance limit before starting the splitting process */
-	protected int initialElements = 100;
+	protected int initialElements = 1000;
 	
   /** Stores which columns to Discretize */  
   protected Range m_DiscretizeCols = new Range();

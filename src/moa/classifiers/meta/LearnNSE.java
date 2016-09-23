@@ -1,16 +1,19 @@
 package moa.classifiers.meta;
 
-import weka.core.Instance;
-import weka.core.Instances;
-
 import java.util.ArrayList;
 import java.util.List;
 
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.Classifier;
+import moa.classifiers.lazy.kNN;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
-import moa.options.*;
+import moa.options.ClassOption;
+import moa.options.FloatOption;
+import moa.options.IntOption;
+import moa.options.MultiChoiceOption;
+import weka.core.Instance;
+import weka.core.Instances;
 
 /**
  * Learning in non-stationary environments.
@@ -32,10 +35,13 @@ import moa.options.*;
 public class LearnNSE extends AbstractClassifier {
 
     public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
-            "Classifier to train.", Classifier.class, "bayes.NaiveBayes");
+            "Classifier to train.", Classifier.class, "lazy.kNN");
+    
+    public IntOption kOption = new IntOption("k", 'k',
+            "Number of neighbors.", 3, 1, 50);
 
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 250, 1, Integer.MAX_VALUE);
+            "Size of the environments.", 100, 1, Integer.MAX_VALUE);
 
     public FloatOption sigmoidSlopeOption = new FloatOption(
             "sigmoidSlope",
@@ -66,6 +72,11 @@ public class LearnNSE extends AbstractClassifier {
     protected long index;
     protected double slope, crossingPoint;
     protected int pruning, ensembleSize;
+    
+    public LearnNSE() {
+		// TODO Auto-generated constructor stub
+    	resetLearningImpl();
+	}
 
     @Override
     public void resetLearningImpl() {
@@ -95,6 +106,9 @@ public class LearnNSE extends AbstractClassifier {
             double mt = this.buffer.numInstances();
             Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
             classifier.resetLearning();
+    		if(classifier instanceof kNN){
+    			((kNN) classifier).kOption.setValue(kOption.getValue());
+    		}
 
             if (this.ensemble.size() > 0) {
                 double et = 0;

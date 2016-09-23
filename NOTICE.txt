@@ -1,0 +1,25 @@
+MOAReduction
+Copyright 2016 org.sci2s
+
+This product includes the following Open Source Softwares
+
+================================================================================
+Apache License Version 2.0
+================================================================================
+
+This product includes and has modified software developed under GNU LESSER GENERAL PUBLIC LICENSE, v3.0 (29 June 2007)
+
+jCOLIBRI2, v2.1 (http://gaia.fdi.ucm.es/research/colibri/jcolibri)
+[LICENSE] https://sourceforge.net/projects/jcolibri-cbr/files/jCOLIBRI-CBR/jCOLIBRI%202.1/
+
+This product is integrated and includes software developed under GNU GENERAL PUBLIC LICENSE, v3.0 (29 June 2007)
+
+MOA, release 2014.11 (http://moa.cms.waikato.ac.nz/)
+
+[LICENSE] https://sourceforge.net/projects/moa-datastream/files/MOA/2014%20November/
+
+Weka, v 3.8.0 (http://www.cs.waikato.ac.nz/~ml/weka/)
+
+[LICENSE] http://www.cs.waikato.ac.nz/~ml/weka/downloading.html
+
+================================================================================

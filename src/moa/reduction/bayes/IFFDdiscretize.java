@@ -13,8 +13,9 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.yahoo.labs.samoa.instances.Instance;
+
 import moa.reduction.core.MOADiscretize;
-import weka.core.Instance;
 import weka.core.Range;
 import weka.core.Utils;
 import weka.filters.unsupervised.attribute.Discretize;

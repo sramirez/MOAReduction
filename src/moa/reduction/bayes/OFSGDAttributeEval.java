@@ -23,13 +23,14 @@ package moa.reduction.bayes;
 
 import java.util.Arrays;
 
+import com.yahoo.labs.samoa.instances.Instance;
+
 import moa.reduction.core.MOAAttributeEvaluator;
 import weka.attributeSelection.ASEvaluation;
 import weka.attributeSelection.AttributeEvaluator;
 import weka.core.AlgVector;
 import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
-import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.RevisionUtils;
 import weka.filters.supervised.attribute.Discretize;

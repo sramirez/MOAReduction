@@ -8,11 +8,11 @@ import moa.classifiers.AbstractClassifier;
 import moa.classifiers.lazy.kNN;
 import moa.core.Measurement;
 import moa.options.ClassOption;
-import moa.options.FloatOption;
-import moa.options.IntOption;
 import weka.classifiers.Classifier;
-import weka.core.Instance;
-import weka.core.Instances;
+
+import com.github.javacliparser.FloatOption;
+import com.github.javacliparser.IntOption;
+import com.yahoo.labs.samoa.instances.Instance;
 
 /**
  * Learning in non-stationary environments.
@@ -71,7 +71,8 @@ public class FISH extends AbstractClassifier {
             this.buffer = new LinkedList<STInstance>();
         }
 
-    	this.buffer.add(new STInstance(inst, index));
+        weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+    	this.buffer.add(new STInstance(winst, index));
         if (this.index < this.periodOption.getValue()) { 
         	trainClassifier(testClassifier, buffer);
         }       
@@ -80,9 +81,9 @@ public class FISH extends AbstractClassifier {
     }
     
     private void trainClassifier(Classifier c, List<STInstance> instances) {
-    	Instances trai = new Instances(instances.get(0).getInstance().dataset());
+    	weka.core.Instances trai = new weka.core.Instances(instances.get(0).getInstance().dataset());
     	for(int z = 0; z < instances.size(); z++){
-    		Instance i = instances.get(z).getInstance();
+    		weka.core.Instance i = instances.get(z).getInstance();
     		i.setWeight(1);
     		trai.add(i);
     	}
@@ -94,7 +95,7 @@ public class FISH extends AbstractClassifier {
 		}
     }
     
-    private double euclideanDistance(Instance i1, Instance i2) throws Exception {
+    private double euclideanDistance(weka.core.Instance i1, weka.core.Instance i2) throws Exception {
     	if(i1.numAttributes() != i2.numAttributes())
 			throw new Exception("Euclidean distance performed on uneven instances");
 		
@@ -116,13 +117,15 @@ public class FISH extends AbstractClassifier {
     @Override
     public double[] getVotesForInstance(Instance inst) {
     	
+    	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+        
     	if (this.index >= this.periodOption.getValue()) {
         	// The specified size is gotten, now the online process is started
             Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
     		if(classifier instanceof kNN){
     			((kNN) classifier).kOption.setValue(kOption.getValue());
     		}
-            
+    		
             // Compute distances (space/time)
             float[] space = new float[buffer.size()];
             float[] time = new float[buffer.size()];
@@ -130,7 +133,7 @@ public class FISH extends AbstractClassifier {
             int idx = 0;
             for(STInstance sti : buffer) {            	
             	try {
-					space[idx] = (float) euclideanDistance(sti.getInstance(), inst);
+					space[idx] = (float) euclideanDistance(sti.getInstance(), winst);
 					time[idx] = this.index - sti.getTime();
 					if(space[idx] > maxSpace)
 						maxSpace = space[idx];
@@ -156,9 +159,9 @@ public class FISH extends AbstractClassifier {
             for (int i = k; i < buffer.size(); i++){
             	try {
 	            	List<STInstance> tra = buffer.subList(0, i);
-					Instances instancestr = new Instances(tra.get(0).getInstance().dataset());
+					weka.core.Instances instancestr = new weka.core.Instances(tra.get(0).getInstance().dataset());
             		for(int z = 0; z < tra.size(); z++) {
-            			Instance instance = tra.get(z).getInstance();
+            			weka.core.Instance instance = tra.get(z).getInstance();
             			instance.setWeight(1);
             			instancestr.add(instance);
             		}
@@ -166,7 +169,7 @@ public class FISH extends AbstractClassifier {
 	            	double errors = 0;
 	            	for(int j = 0; j < k ; j++) {
 		            	// Validation instance is removed from the training set for this run
-	            		Instance removed = instancestr.remove(j);
+	            		weka.core.Instance removed = instancestr.remove(j);
 	            		// Train for the tuple i, j
 	            			
 	            		classifier.buildClassifier(instancestr);
@@ -203,7 +206,7 @@ public class FISH extends AbstractClassifier {
     	int pred = 0;
 		try {
 			if(index != 0)
-				pred = (int) testClassifier.classifyInstance(inst);
+				pred = (int) testClassifier.classifyInstance(winst);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -225,11 +228,11 @@ public class FISH extends AbstractClassifier {
     }
     
     class STInstance implements Comparable<STInstance>{
-    	private Instance instance;
+    	private weka.core.Instance instance;
     	private double distance;
     	private long time;
     	
-    	public STInstance(Instance instance, long time) {
+    	public STInstance(weka.core.Instance instance, long time) {
 			// TODO Auto-generated constructor stub
     		this.instance = instance;
     		this.time = time;
@@ -244,11 +247,11 @@ public class FISH extends AbstractClassifier {
 			this.distance = distance;
 		}
     	
-    	public Instance getInstance() {
+    	public weka.core.Instance getInstance() {
 			return instance;
 		}
     	
-    	public void setInstance(Instance instance) {
+    	public void setInstance(weka.core.Instance instance) {
 			this.instance = instance;
 		}
     	

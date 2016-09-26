@@ -2,16 +2,17 @@ package moa.reduction.test;
 
 import java.io.IOException;
 
+import com.yahoo.labs.samoa.instances.Instance;
+
 import moa.classifiers.Classifier;
 import moa.classifiers.competence.NEFCSSRR;
 import moa.classifiers.meta.FISH;
 import moa.classifiers.meta.LearnNSE;
+import moa.core.InstanceExample;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesReduction;
 import moa.streams.ArffFileStream;
 import moa.streams.generators.RandomRBFGenerator;
-import weka.core.Instance;
-
 
 public class ExperimentTest {
 
@@ -19,7 +20,7 @@ public class ExperimentTest {
         }
 
         public void run(int numInstances, boolean isTesting){
-                Classifier learner = new LearnNSE();
+                Classifier learner = new NaiveBayesReduction();
                 
                 RandomRBFGenerator stream = new RandomRBFGenerator();
                 //stream.numAttsOption.setValue(1000);
@@ -32,9 +33,9 @@ public class ExperimentTest {
                 int numberSamples = 0;
                 long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
                 while (stream.hasMoreInstances() && numberSamples < numInstances) {
-                        Instance trainInst = stream.nextInstance();
+                        InstanceExample trainInst = stream.nextInstance();
                         if (isTesting) {
-                                if (learner.correctlyClassifies(trainInst)){
+                                if (learner.correctlyClassifies(trainInst.getData())){
                                         numberSamplesCorrect++;
                                 }
                         }

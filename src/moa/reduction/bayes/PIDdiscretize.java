@@ -27,9 +27,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.yahoo.labs.samoa.instances.Instance;
+
 import moa.reduction.core.MOADiscretize;
 import weka.core.ContingencyTables;
-import weka.core.Instance;
 import weka.core.Range;
 import weka.core.Utils;
 

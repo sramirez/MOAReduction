@@ -3,17 +3,18 @@ package moa.classifiers.meta;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.github.javacliparser.FloatOption;
+import com.github.javacliparser.IntOption;
+import com.github.javacliparser.MultiChoiceOption;
+import com.yahoo.labs.samoa.instances.Instance;
+import com.yahoo.labs.samoa.instances.Instances;
+
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.Classifier;
 import moa.classifiers.lazy.kNN;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.options.ClassOption;
-import moa.options.FloatOption;
-import moa.options.IntOption;
-import moa.options.MultiChoiceOption;
-import weka.core.Instance;
-import weka.core.Instances;
 
 /**
  * Learning in non-stationary environments.
@@ -104,7 +105,7 @@ public class LearnNSE extends AbstractClassifier {
         if (this.index % this.periodOption.getValue() == 0) {
             this.index = 0;
             double mt = this.buffer.numInstances();
-            Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
+            Classifier classifier = (Classifier) getPreparedClassOption(this.baseLearnerOption);
             classifier.resetLearning();
     		if(classifier instanceof kNN){
     			((kNN) classifier).kOption.setValue(kOption.getValue());

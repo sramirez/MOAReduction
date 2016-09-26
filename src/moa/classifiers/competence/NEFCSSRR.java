@@ -4,6 +4,10 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.github.javacliparser.FloatOption;
+import com.github.javacliparser.IntOption;
+import com.yahoo.labs.samoa.instances.Instance;
+
 import jcolibri.cbrcore.Attribute;
 import jcolibri.cbrcore.CBRCase;
 import jcolibri.method.maintenance.TwoStepCaseBaseEditMethod;
@@ -11,9 +15,6 @@ import jcolibri.method.retrieve.NNretrieval.similarity.global.Average;
 import jcolibri.method.retrieve.NNretrieval.similarity.local.EuclideanDistance;
 import jcolibri.method.reuse.classification.KNNClassificationConfig;
 import jcolibri.method.reuse.classification.MajorityVotingMethod;
-import moa.options.FloatOption;
-import moa.options.IntOption;
-import weka.core.Instance;
 
 /**
  * A case-base maintained by a maintenance method composed of two methods:
@@ -81,8 +82,9 @@ public class NEFCSSRR extends MaintainedCB {
     	if(index <= periodOption.getValue()) {
     		if(!initialized) {
     			initialized = true;
-            	List<Instance> l = new LinkedList<Instance>();
-            	l.add(inst);
+            	List<weka.core.Instance> l = new LinkedList<weka.core.Instance>();
+            	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+            	l.add(winst);
             	initCaseBase(l);	
             } else {
         		List<CBRCase> l = new LinkedList<CBRCase>();

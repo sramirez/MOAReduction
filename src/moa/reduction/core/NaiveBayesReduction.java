@@ -32,7 +32,6 @@ import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
-import moa.options.IntOption;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
 import moa.reduction.bayes.OCdiscretize;
@@ -42,9 +41,11 @@ import moa.reduction.bayes.PIDdiscretize;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import com.github.javacliparser.IntOption;
+import com.yahoo.labs.samoa.instances.DenseInstance;
+import com.yahoo.labs.samoa.instances.Instance;
+
 import weka.core.Attribute;
-import weka.core.Instance;
-import weka.core.Instances;
 
 /**
  * Naive Bayes incremental learner.
@@ -76,9 +77,9 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption numFeaturesOption = new IntOption("numFeatures", 'f', 
     		"The number of features to select", 25, 1, Integer.MAX_VALUE);
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
-    		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 1, 0, 3);
+    		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 0, 0, 3);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 3, 0, 3);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 1000, 1, Integer.MAX_VALUE);    
     
@@ -111,7 +112,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     @Override
-    public void trainOnInstanceImpl(weka.core.Instance rinst) {
+    public void trainOnInstanceImpl(Instance rinst) {
     	
     	if(fsmethodOption.getValue() != 0) {
     		try {
@@ -141,7 +142,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     @Override
-    public double[] getVotesForInstance(weka.core.Instance inst) {
+    public double[] getVotesForInstance(Instance inst) {
         return doNaiveBayesPrediction(inst, this.observedClassDistribution,
                 this.attributeObservers);
     }
@@ -192,20 +193,22 @@ public class NaiveBayesReduction extends AbstractClassifier {
     
     private Instance performFS(Instance rinst) {
     	// Feature selection process performed before
-    	Instance sinst = rinst;
+		weka.core.Instance winst = new weka.core.DenseInstance(rinst.weight(), rinst.toDoubleArray());
+		
 		if(fselector != null) {
 			if(fselector.isUpdated() && totalCount % winSizeOption.getValue() == 0) {
 		    	fselector.applySelection();
 				selector = new AttributeSelection();
 				Ranker ranker = new Ranker();
-				ranker.setNumToSelect(Math.min(numFeaturesOption.getValue(), rinst.numAttributes() - 1));
+				ranker.setNumToSelect(Math.min(numFeaturesOption.getValue(), winst.numAttributes() - 1));
 				selector.setEvaluator((ASEvaluation) fselector);
 				selector.setSearch(ranker);
-				ArrayList<Attribute> list = Collections.list(rinst.enumerateAttributes());
-				list.add(rinst.classAttribute());
-			  	Instances single = new Instances("single", list, 1);
-			  	single.setClassIndex(rinst.classIndex());
-			  	single.add(rinst);
+		    	
+				ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
+				list.add(winst.classAttribute());
+			  	weka.core.Instances single = new weka.core.Instances ("single", list, 1);
+			  	single.setClassIndex(winst.classIndex());
+			  	single.add(winst);
 			  	try {
 					selector.SelectAttributes(single);
 					System.out.println("Selected features: " + selector.toResultsString());
@@ -218,17 +221,18 @@ public class NaiveBayesReduction extends AbstractClassifier {
 		
 		if(selector != null) {
 			try {
-				sinst = selector.reduceDimensionality(rinst);
+				weka.core.Instance wrinst = selector.reduceDimensionality(winst);
+				return(new DenseInstance(wrinst.weight(), wrinst.toDoubleArray()));
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
     	
-    	return sinst;
+    	return rinst;
     }
 
-    public double[] doNaiveBayesPrediction(weka.core.Instance inst,
+    public double[] doNaiveBayesPrediction(Instance inst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> attributeObservers) {
     	
@@ -257,7 +261,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     // Naive Bayes Prediction using log10 for VFDR rules 
-    public double[] doNaiveBayesPredictionLog(weka.core.Instance rinst,
+    public double[] doNaiveBayesPredictionLog(Instance rinst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
     	

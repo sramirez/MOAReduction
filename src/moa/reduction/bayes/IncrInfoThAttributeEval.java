@@ -22,7 +22,6 @@
 package moa.reduction.bayes;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,17 +31,18 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import moa.reduction.core.MOAAttributeEvaluator;
+
 import weka.attributeSelection.ASEvaluation;
 import weka.attributeSelection.AttributeEvaluator;
 import weka.core.Attribute;
 import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
 import weka.core.ContingencyTables;
-import weka.core.Instance;
-import weka.core.Instances;
 import weka.core.RevisionUtils;
 import weka.filters.supervised.attribute.Discretize;
 import weka.filters.unsupervised.attribute.NumericToBinary;
+
+import com.yahoo.labs.samoa.instances.Instance;
 
 /**
  * <!-- globalinfo-start --> InfoGainAttributeEval :<br/>
@@ -219,7 +219,7 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
    * @throws Exception if the evaluator has not been generated successfully
    */
   @Override
-  public void buildEvaluator(Instances data) throws Exception {}
+  public void buildEvaluator(weka.core.Instances data) throws Exception {}
   
   /**
    * Updates an information gain attribute evaluator. Discretizes all
@@ -232,11 +232,12 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
 	  
   	if(counts == null) {
 	    // can evaluator handle data?	  
-	  	ArrayList<Attribute> list = Collections.list(inst.enumerateAttributes());
-	  	list.add(inst.classAttribute());
-	  	Instances data = new Instances("single", list, 1);
-	  	data.setClassIndex(inst.classIndex());
-	  	data.add(inst);
+		weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+	  	ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
+	  	list.add(winst.classAttribute());
+	  	weka.core.Instances data = new weka.core.Instances("single", list, 1);
+	  	data.setClassIndex(winst.classIndex());
+	  	data.add(winst);
 	    getCapabilities().testWithFail(data);
 	    classIndex = inst.classIndex();
 	    counts = (HashMap<Key, Float>[]) new HashMap[inst.numAttributes()];

@@ -29,8 +29,9 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
 
+import com.yahoo.labs.samoa.instances.Instance;
+
 import moa.reduction.core.MOADiscretize;
-import weka.core.Instance;
 import weka.core.Range;
 import weka.core.Utils;
 
@@ -189,7 +190,7 @@ public class OCdiscretize implements MOADiscretize{
 		  interval_q.add(new PriorityQueue<Interval>());
 		  interval_l.add(new ArrayList<Interval>());
 		  example_q.add(new LinkedList<Pair>());
-		  it_bin.add(Collections.emptyIterator());
+		  it_bin.add(Collections.<Double>emptyList().iterator());
 		  previous_bin.add(new Bin());
 		  last_interval.add(new Interval());		  
 	  }  

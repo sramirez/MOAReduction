@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.github.javacliparser.IntOption;
+
 import jcolibri.casebase.CachedLinealCaseBase;
 import jcolibri.cbrcore.Attribute;
 import jcolibri.cbrcore.CBRCase;
@@ -21,10 +23,12 @@ import jcolibri.method.retrieve.selection.SelectCases;
 import jcolibri.method.reuse.classification.KNNClassificationConfig;
 import jcolibri.method.reuse.classification.KNNClassificationMethod;
 import jcolibri.method.reuse.classification.MajorityVotingMethod;
+
 import moa.classifiers.AbstractClassifier;
 import moa.core.Measurement;
-import moa.options.IntOption;
-import weka.core.Instance;
+
+import com.yahoo.labs.samoa.instances.Instance;
+
 
 /**
  * A case-base maintained by a maintenance method composed of two methods:
@@ -36,7 +40,7 @@ import weka.core.Instance;
  *
  */
 @SuppressWarnings("serial")
-public abstract class MaintainedCB extends AbstractClassifier {
+public class MaintainedCB extends AbstractClassifier {
 
 	public IntOption kOption = new IntOption("neighbors", 'k',
             "Number of neighbors used in search.", 5, 1, Integer.MAX_VALUE);
@@ -51,7 +55,7 @@ public abstract class MaintainedCB extends AbstractClassifier {
 	WekaConnector _connector;
 	CBRCaseBase _caseBase;
     
-    public void initCaseBase(List<Instance> init){
+    public void initCaseBase(List<weka.core.Instance> init){
 		try {
 			_connector = new WekaConnector(init);
 			_caseBase  = new CachedLinealCaseBase();
@@ -102,7 +106,9 @@ public abstract class MaintainedCB extends AbstractClassifier {
 		return(_case); 
     }
     
-    abstract TwoStepCaseBaseEditMethod getMaintenanceMethod();
+    TwoStepCaseBaseEditMethod getMaintenanceMethod() {
+		return null;
+	}
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
@@ -115,8 +121,9 @@ public abstract class MaintainedCB extends AbstractClassifier {
         	_caseBase.learnCases(l);
         } else {
         	initialized = true;
-        	List<Instance> l = new LinkedList<Instance>();
-        	l.add(inst);
+        	List<weka.core.Instance> l = new LinkedList<weka.core.Instance>();
+        	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+        	l.add(winst);
         	initCaseBase(l);
         }
 
@@ -148,7 +155,7 @@ public abstract class MaintainedCB extends AbstractClassifier {
         return null;
     }
 
-	@Override
+    @Override
 	public double[] getVotesForInstance(Instance instance) {
 		Double solution = new Double(0);
 		if(initialized){

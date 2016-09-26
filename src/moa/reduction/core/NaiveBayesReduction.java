@@ -39,10 +39,10 @@ import moa.reduction.bayes.OFSGDAttributeEval;
 import moa.reduction.bayes.PIDdiscretize;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.github.javacliparser.IntOption;
-import com.yahoo.labs.samoa.instances.DenseInstance;
 import com.yahoo.labs.samoa.instances.Instance;
 
 import weka.core.Attribute;
@@ -86,6 +86,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
     protected int totalCount = 0;
+    protected Set<Integer> selectedFeatures = new HashSet<Integer>();
     
     public NaiveBayesReduction () {    	
     	if(fsmethodOption.getValue() == 3) {
@@ -112,19 +113,22 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     @Override
-    public void trainOnInstanceImpl(Instance rinst) {
+    public void trainOnInstanceImpl(Instance inst) {
     	
+    	Instance rinst = inst;
     	if(fsmethodOption.getValue() != 0) {
     		try {
-				fselector.updateEvaluator(rinst);
+				fselector.updateEvaluator(inst);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
     	}
 	    	
-    	if(discmethodOption.getValue() != 0) 
-    		discretizer.updateEvaluator(rinst);
+    	if(discmethodOption.getValue() != 0) {
+    		discretizer.updateEvaluator(inst);
+    		rinst = discretizer.applyDiscretization(inst);
+    	}
     	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
@@ -191,7 +195,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
         return new GaussianNumericAttributeClassObserver();
     }
     
-    private Instance performFS(Instance rinst) {
+    private void performFS(Instance rinst) {
     	// Feature selection process performed before
 		weka.core.Instance winst = new weka.core.DenseInstance(rinst.weight(), rinst.toDoubleArray());
 		
@@ -204,32 +208,28 @@ public class NaiveBayesReduction extends AbstractClassifier {
 				selector.setEvaluator((ASEvaluation) fselector);
 				selector.setSearch(ranker);
 		    	
-				ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
-				list.add(winst.classAttribute());
+				ArrayList<Attribute> list = new ArrayList<Attribute>();
+			  	//ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
+			  	//list.add(winst.classAttribute());
+				for(int i = 0; i < rinst.numAttributes(); i++) 
+					list.add(new Attribute(rinst.attribute(i).name(), i));
+				//ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
+				//list.add(winst.classAttribute());
 			  	weka.core.Instances single = new weka.core.Instances ("single", list, 1);
-			  	single.setClassIndex(winst.classIndex());
+			  	single.setClassIndex(rinst.classIndex());
 			  	single.add(winst);
 			  	try {
 					selector.SelectAttributes(single);
 					System.out.println("Selected features: " + selector.toResultsString());
+					selectedFeatures.clear();
+					for(int att : selector.selectedAttributes())
+						selectedFeatures.add(att);
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
-    	}    		
-		
-		if(selector != null) {
-			try {
-				weka.core.Instance wrinst = selector.reduceDimensionality(winst);
-				return(new DenseInstance(wrinst.weight(), wrinst.toDoubleArray()));
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-    	
-    	return rinst;
+    	}
     }
 
     public double[] doNaiveBayesPrediction(Instance inst,
@@ -238,8 +238,10 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	
     	// Feature selection process performed before
     	Instance sinst = inst;
-    	if(fsmethodOption.getValue() != 0) sinst = performFS(sinst);
-    	if(discmethodOption.getValue() != 0) sinst = discretizer.applyDiscretization(sinst);
+    	if(fsmethodOption.getValue() != 0) 
+    		performFS(sinst);
+    	if(discmethodOption.getValue() != 0) 
+    		sinst = discretizer.applyDiscretization(sinst);
 		
 		// Naive Bayes predictions
         double[] votes = new double[observedClassDistribution.numValues()];
@@ -248,12 +250,13 @@ public class NaiveBayesReduction extends AbstractClassifier {
             votes[classIndex] = observedClassDistribution.getValue(classIndex)
                     / observedClassSum;
             for (int attIndex = 0; attIndex < sinst.numAttributes() - 1; attIndex++) {
-                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,
-                        sinst);
-                AttributeClassObserver obs = attributeObservers.get(attIndex);
-                if ((obs != null) && !sinst.isMissing(instAttIndex)) {
-                    votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(sinst.value(instAttIndex), classIndex);
-                }
+            	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
+	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
+	                AttributeClassObserver obs = attributeObservers.get(attIndex);
+	                if ((obs != null) && !sinst.isMissing(instAttIndex)) {
+	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(sinst.value(instAttIndex), classIndex);
+	                }
+            	}
             }
         }
         // TODO: need logic to prevent underflow?
@@ -266,7 +269,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
             AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
     	
     	// Feature selection process performed before
-    	Instance inst = performFS(rinst);
+    	performFS(rinst);
     	
         AttributeClassObserver obs;
         double[] votes = new double[observedClassDistribution.numValues()];
@@ -274,17 +277,17 @@ public class NaiveBayesReduction extends AbstractClassifier {
         for (int classIndex = 0; classIndex < votes.length; classIndex++) {
             votes[classIndex] = Math.log10(observedClassDistribution.getValue(classIndex)
                     / observedClassSum);
-            for (int attIndex = 0; attIndex < inst.numAttributes() - 1; attIndex++) {
+            for (int attIndex = 0; attIndex < rinst.numAttributes() - 1; attIndex++) {
                 int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,
-                        inst);
-                if (inst.attribute(instAttIndex).isNominal()) {
+                       rinst);
+                if (rinst.attribute(instAttIndex).isNominal()) {
                     obs = observers.get(attIndex);
                 } else {
                     obs = observers2.get(attIndex);
                 }
 
-                if ((obs != null) && !inst.isMissing(instAttIndex)) {
-                    votes[classIndex] += Math.log10(obs.probabilityOfAttributeValueGivenClass(inst.value(instAttIndex), classIndex));
+                if ((obs != null) && !rinst.isMissing(instAttIndex)) {
+                    votes[classIndex] += Math.log10(obs.probabilityOfAttributeValueGivenClass(rinst.value(instAttIndex), classIndex));
 
                 }
             }

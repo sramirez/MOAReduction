@@ -231,14 +231,17 @@ public class IncrInfoThAttributeEval extends ASEvaluation implements
   public void updateEvaluator(Instance inst) throws Exception {
 	  
   	if(counts == null) {
-	    // can evaluator handle data?	  
+	    // can evaluator handle data?
 		weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
-	  	ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
-	  	list.add(winst.classAttribute());
+		ArrayList<Attribute> list = new ArrayList<Attribute>();
+	  	//ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
+	  	//list.add(winst.classAttribute());
+		for(int i = 0; i < inst.numAttributes(); i++) 
+			list.add(new Attribute(inst.attribute(i).name(), i));
 	  	weka.core.Instances data = new weka.core.Instances("single", list, 1);
-	  	data.setClassIndex(winst.classIndex());
+	  	data.setClassIndex(inst.classIndex());
 	  	data.add(winst);
-	    getCapabilities().testWithFail(data);
+	    //getCapabilities().testWithFail(data);
 	    classIndex = inst.classIndex();
 	    counts = (HashMap<Key, Float>[]) new HashMap[inst.numAttributes()];
 	    for(int i = 0; i < counts.length; i++) counts[i] = new HashMap<Key, Float>();

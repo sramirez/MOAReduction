@@ -43,7 +43,7 @@ import com.yahoo.labs.samoa.instances.Instance;
 public class MaintainedCB extends AbstractClassifier {
 
 	public IntOption kOption = new IntOption("neighbors", 'k',
-            "Number of neighbors used in search.", 5, 1, Integer.MAX_VALUE);
+            "Number of neighbors used in search.", 3, 1, Integer.MAX_VALUE);
     public IntOption periodOption = new IntOption("period", 'p',
             "Size of the environments.", 100, 1, Integer.MAX_VALUE);
 
@@ -148,7 +148,7 @@ public class MaintainedCB extends AbstractClassifier {
     		/*for(CBRCase c: deleted){	
     			System.out.println(c.getID());
     		}*/    		
-    		_caseBase.forgetCases(deleted);           
+    		_caseBase.forgetCases(deleted);
         }
         index++;
     }

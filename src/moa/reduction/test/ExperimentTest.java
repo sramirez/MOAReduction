@@ -27,7 +27,7 @@ public class ExperimentTest {
         public void run(int numInstances, boolean isTesting){
         		//kNN knn = new kNN();
         		//knn.kOption.setValue(5);
-                Classifier learner = new ICFFullCB();
+                Classifier learner = new NEFCSSRR();
                 
                 
                 RandomRBFGenerator stream = new RandomRBFGenerator();

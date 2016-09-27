@@ -1,15 +1,8 @@
 package moa.classifiers.competence;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-
-import weka.core.Attribute;
-
-import com.github.javacliparser.FloatOption;
-import com.github.javacliparser.IntOption;
-import com.yahoo.labs.samoa.instances.Instance;
 
 import jcolibri.cbrcore.CBRCase;
 import jcolibri.method.maintenance.TwoStepCaseBaseEditMethod;
@@ -17,6 +10,10 @@ import jcolibri.method.retrieve.NNretrieval.similarity.global.Average;
 import jcolibri.method.retrieve.NNretrieval.similarity.local.EuclideanDistance;
 import jcolibri.method.reuse.classification.KNNClassificationConfig;
 import jcolibri.method.reuse.classification.MajorityVotingMethod;
+
+import com.github.javacliparser.FloatOption;
+import com.github.javacliparser.IntOption;
+import com.yahoo.labs.samoa.instances.Instance;
 
 /**
  * A case-base maintained by a maintenance method composed of two methods:
@@ -108,8 +105,6 @@ public class NEFCSSRR extends MaintainedCB {
         
     	Collection<CBRCase> nc = new LinkedList<CBRCase>();
         if (index >= periodOption.getValue() && index % periodOption.getValue() == 0) {
-        	
-        	System.out.println("\nNum Cases in the old casebase: " + _caseBase.getCases().size());
         	if(!newWindow.isEmpty()) { // Second window
         		nc = nefcs.applyMaintenance(newWindow, oldWindow, _caseBase.getCases());
         		if(nc.size() > limitOption.getValue()){

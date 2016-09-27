@@ -1,14 +1,16 @@
 package moa.classifiers.competence;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+
+import weka.core.Attribute;
 
 import com.github.javacliparser.FloatOption;
 import com.github.javacliparser.IntOption;
 import com.yahoo.labs.samoa.instances.Instance;
 
-import jcolibri.cbrcore.Attribute;
 import jcolibri.cbrcore.CBRCase;
 import jcolibri.method.maintenance.TwoStepCaseBaseEditMethod;
 import jcolibri.method.retrieve.NNretrieval.similarity.global.Average;
@@ -55,7 +57,8 @@ public class NEFCSSRR extends MaintainedCB {
    		wekaSimConfig = new KNNClassificationConfig();   		
    		wekaSimConfig.setDescriptionSimFunction(new Average());
    		try {
-   			wekaSimConfig.addMapping(new Attribute("instance", Class.forName("jcolibri.connector.WekaInstanceDescription")), 
+   			wekaSimConfig.addMapping(new jcolibri.cbrcore.Attribute(
+   					"instance", Class.forName("jcolibri.connector.WekaInstanceDescription")), 
    					new EuclideanDistance());
    		} catch (ClassNotFoundException e) {
    			// TODO Auto-generated catch block
@@ -76,28 +79,35 @@ public class NEFCSSRR extends MaintainedCB {
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
-    	this.index++;
-        
+    	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+    	if(initialized)
+    		winst.setDataset(emptyDataset);
+    	
         //Store immediately the instance in the case-base during the first round  
-    	if(index <= periodOption.getValue()) {
+    	if(index < periodOption.getValue()) {
     		if(!initialized) {
     			initialized = true;
+    			initializeDataset(inst); 
+            	winst.setDataset(emptyDataset);
+            	
             	List<weka.core.Instance> l = new LinkedList<weka.core.Instance>();
-            	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
             	l.add(winst);
             	initCaseBase(l);	
-            } else {
+            	
+            } else {            	            	
         		List<CBRCase> l = new LinkedList<CBRCase>();
-            	l.add(createCase(inst));
+        		CBRCase ncase = createCase(winst);
+            	l.add(ncase);
             	_caseBase.learnCases(l);
-        		oldWindow.add(createCase(inst));
+        		oldWindow.add(ncase);
+        		      		
             }    		
     	} else {
-    		newWindow.add(createCase(inst));
+    		newWindow.add(createCase(winst));
     	}
         
     	Collection<CBRCase> nc = new LinkedList<CBRCase>();
-        if (this.index % this.periodOption.getValue() == 0) {
+        if (index >= periodOption.getValue() && index % periodOption.getValue() == 0) {
         	
         	System.out.println("\nNum Cases in the old casebase: " + _caseBase.getCases().size());
         	if(!newWindow.isEmpty()) { // Second window
@@ -114,5 +124,6 @@ public class NEFCSSRR extends MaintainedCB {
         	System.out.println("\nNum Cases in the new casebase: " + _caseBase.getCases().size());
     		resetLearningImpl();
         }
+        index++;
     }
 }

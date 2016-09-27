@@ -1,5 +1,6 @@
 package moa.classifiers.competence;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,7 +24,6 @@ import jcolibri.method.retrieve.selection.SelectCases;
 import jcolibri.method.reuse.classification.KNNClassificationConfig;
 import jcolibri.method.reuse.classification.KNNClassificationMethod;
 import jcolibri.method.reuse.classification.MajorityVotingMethod;
-
 import moa.classifiers.AbstractClassifier;
 import moa.core.Measurement;
 
@@ -47,13 +47,14 @@ public class MaintainedCB extends AbstractClassifier {
     public IntOption periodOption = new IntOption("period", 'p',
             "Size of the environments.", 100, 1, Integer.MAX_VALUE);
 
-    protected long index;
+    protected long index = 0;
     protected boolean initialized = false;
     protected KNNClassificationConfig wekaSimConfig;
     TwoStepCaseBaseEditMethod maintenanceMethod;
     
 	WekaConnector _connector;
 	CBRCaseBase _caseBase;
+	protected weka.core.Instances emptyDataset;
     
     public void initCaseBase(List<weka.core.Instance> init){
 		try {
@@ -85,7 +86,7 @@ public class MaintainedCB extends AbstractClassifier {
         this.index = 0;
     }
     
-    protected CBRCase createCase(Instance instance) {	
+    protected CBRCase createCase(weka.core.Instance instance) {	
     	CBRCase _case = new CBRCase();
 		try {			
 			CaseComponent description = (CaseComponent)_connector.descriptionClass.newInstance();
@@ -110,26 +111,36 @@ public class MaintainedCB extends AbstractClassifier {
 		return null;
 	}
 
+    protected void initializeDataset(Instance inst) {
+    	ArrayList<weka.core.Attribute> list = new ArrayList<weka.core.Attribute>();
+		for(int i = 0; i < inst.numAttributes(); i++) 
+			list.add(new weka.core.Attribute("att" + i, i));
+	  	emptyDataset = new weka.core.Instances ("single", list, 1);
+	  	emptyDataset.setClassIndex(inst.classIndex());  
+    }
+    
     @Override
     public void trainOnInstanceImpl(Instance inst) {
-    	this.index++;
-        
+    	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+    	
         //Store immediately the instance in the case-base    	
         if(initialized) {
         	List<CBRCase> l = new LinkedList<CBRCase>();
-        	l.add(createCase(inst));
+        	winst.setDataset(emptyDataset);
+        	l.add(createCase(winst));
         	_caseBase.learnCases(l);
         } else {
         	initialized = true;
+        	initializeDataset(inst);
+        	winst.setDataset(emptyDataset);
+        	
         	List<weka.core.Instance> l = new LinkedList<weka.core.Instance>();
-        	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
         	l.add(winst);
         	initCaseBase(l);
         }
 
-        if (this.index % this.periodOption.getValue() == 0) {
-        	resetLearningImpl();
-
+        if (index >= periodOption.getValue() && index % periodOption.getValue() == 0) {
+        	System.out.println("Tamaño de casebase: " + _caseBase.getCases().size());
         	TwoStepCaseBaseEditMethod maintenance = getMaintenanceMethod();
     		Collection<CBRCase> deleted = maintenance.retrieveCasesToDelete(_caseBase.getCases(), wekaSimConfig);		
     		System.out.println("\nNum Cases deleted by Alg: " + deleted.size());
@@ -139,6 +150,7 @@ public class MaintainedCB extends AbstractClassifier {
     		}*/    		
     		_caseBase.forgetCases(deleted);           
         }
+        index++;
     }
 
     @Override
@@ -159,7 +171,9 @@ public class MaintainedCB extends AbstractClassifier {
 	public double[] getVotesForInstance(Instance instance) {
 		Double solution = new Double(0);
 		if(initialized){
-			CBRCase query = createCase(instance);
+			weka.core.Instance winst = new weka.core.DenseInstance(instance.weight(), instance.toDoubleArray());
+			winst.setDataset(emptyDataset);
+			CBRCase query = createCase(winst);
 			//BasicClassificationOracle oracle = new BasicClassificationOracle();
 			Collection<CBRCase> cases = _caseBase.getCases();
 			Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(cases, query, wekaSimConfig);

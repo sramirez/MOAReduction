@@ -295,8 +295,4 @@ public class NaiveBayesReduction extends AbstractClassifier {
         return votes;
 
     }
-
-    public void manageMemory(int currentByteSize, int maxByteSize) {
-        // TODO Auto-generated method stub
-    }
 }

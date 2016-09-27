@@ -2,10 +2,15 @@ package moa.reduction.test;
 
 import java.io.IOException;
 
+import weka.classifiers.lazy.IBk;
+
 import com.yahoo.labs.samoa.instances.Instance;
 
 import moa.classifiers.Classifier;
+import moa.classifiers.competence.BBNRFullCB;
+import moa.classifiers.competence.ICFFullCB;
 import moa.classifiers.competence.NEFCSSRR;
+import moa.classifiers.lazy.kNN;
 import moa.classifiers.meta.FISH;
 import moa.classifiers.meta.LearnNSE;
 import moa.core.InstanceExample;
@@ -20,7 +25,10 @@ public class ExperimentTest {
         }
 
         public void run(int numInstances, boolean isTesting){
-                Classifier learner = new NaiveBayesReduction();
+        		//kNN knn = new kNN();
+        		//knn.kOption.setValue(5);
+                Classifier learner = new ICFFullCB();
+                
                 
                 RandomRBFGenerator stream = new RandomRBFGenerator();
                 //stream.numAttsOption.setValue(1000);
@@ -49,6 +57,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(10000, true);
+                exp.run(1000, true);
         }
 }

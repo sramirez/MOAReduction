@@ -1,5 +1,6 @@
 package moa.classifiers.meta;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -9,6 +10,7 @@ import moa.classifiers.lazy.kNN;
 import moa.core.Measurement;
 import moa.options.ClassOption;
 import weka.classifiers.Classifier;
+import weka.core.Attribute;
 
 import com.github.javacliparser.FloatOption;
 import com.github.javacliparser.IntOption;
@@ -33,7 +35,7 @@ public class FISH extends AbstractClassifier {
             "Classifier to train.", Classifier.class, "lazy.IBk");
 
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 100, 100, Integer.MAX_VALUE);
+            "Size of the environments.", 10, 10, Integer.MAX_VALUE);
 
     public FloatOption distancePropOption = new FloatOption(
             "distanceProportion",
@@ -48,6 +50,8 @@ public class FISH extends AbstractClassifier {
     protected long index = 0;
     protected double distanceProp;
     protected int k, period;
+    protected int classIndex;
+    protected weka.core.Instances emptyDataset;
   
 
     @Override
@@ -69,6 +73,13 @@ public class FISH extends AbstractClassifier {
         // Store instance in the buffer
         if (this.buffer == null) {
             this.buffer = new LinkedList<STInstance>();
+            this.classIndex = inst.classIndex();
+
+        	ArrayList<Attribute> list = new ArrayList<Attribute>();
+    		for(int i = 0; i < inst.numAttributes(); i++) 
+    			list.add(new Attribute("att" + i, i));
+    	  	emptyDataset = new weka.core.Instances ("single", list, 1);
+    	  	emptyDataset.setClassIndex(classIndex);            
         }
 
         weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
@@ -81,14 +92,9 @@ public class FISH extends AbstractClassifier {
     }
     
     private void trainClassifier(Classifier c, List<STInstance> instances) {
-    	weka.core.Instances trai = new weka.core.Instances(instances.get(0).getInstance().dataset());
-    	for(int z = 0; z < instances.size(); z++){
-    		weka.core.Instance i = instances.get(z).getInstance();
-    		i.setWeight(1);
-    		trai.add(i);
-    	}
+		weka.core.Instances train = listToWInstances(new weka.core.Instances(emptyDataset), instances);
 		try {
-			c.buildClassifier(trai);
+			c.buildClassifier(train);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -101,9 +107,8 @@ public class FISH extends AbstractClassifier {
 		
 		double accum = 0;
 		for(int i = 0; i < i1.numAttributes(); i++) {
-			if(i != i1.classIndex()) {
+			if(i != classIndex)
 				accum += Math.pow(i1.value(i) - i2.value(i), 2);
-			}
 		}
 		
 		return Math.sqrt(accum);
@@ -118,8 +123,9 @@ public class FISH extends AbstractClassifier {
     public double[] getVotesForInstance(Instance inst) {
     	
     	weka.core.Instance winst = new weka.core.DenseInstance(inst.weight(), inst.toDoubleArray());
+	  	winst.setDataset(emptyDataset);
         
-    	if (this.index >= this.periodOption.getValue()) {
+    	if (index >= periodOption.getValue() && index % periodOption.getValue() == 0) {
         	// The specified size is gotten, now the online process is started
             Classifier classifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
     		if(classifier instanceof kNN){
@@ -158,21 +164,14 @@ public class FISH extends AbstractClassifier {
 			// Apply leave-one-out cross validation (validation set formed by top-k nearest neighbors)
             for (int i = k; i < buffer.size(); i++){
             	try {
-	            	List<STInstance> tra = buffer.subList(0, i);
-					weka.core.Instances instancestr = new weka.core.Instances(tra.get(0).getInstance().dataset());
-            		for(int z = 0; z < tra.size(); z++) {
-            			weka.core.Instance instance = tra.get(z).getInstance();
-            			instance.setWeight(1);
-            			instancestr.add(instance);
-            		}
-            		
+            		weka.core.Instances train = listToWInstances(new weka.core.Instances(emptyDataset), buffer.subList(0, i));            		
 	            	double errors = 0;
 	            	for(int j = 0; j < k ; j++) {
 		            	// Validation instance is removed from the training set for this run
-	            		weka.core.Instance removed = instancestr.remove(j);
+	            		weka.core.Instance removed = train.remove(j);
 	            		// Train for the tuple i, j
 	            			
-	            		classifier.buildClassifier(instancestr);
+	            		classifier.buildClassifier(train);
 		            	
 	                	// validate on instance j (from val set)
 	            		int pred = (int) classifier.classifyInstance(removed);
@@ -180,7 +179,7 @@ public class FISH extends AbstractClassifier {
 							errors++;
 	                	
 	                	// We add the skipped instance again
-	                	instancestr.add(j, removed);
+	            		train.add(j, removed);
 	            	}
                 	measurements.add(errors / k);
 	            	
@@ -216,6 +215,15 @@ public class FISH extends AbstractClassifier {
     	//boolean good = pred == (int) inst.classValue();
     	//System.out.println("Good prediction?: " + good);
     	return v;
+    }
+    
+    private weka.core.Instances listToWInstances(weka.core.Instances dataset, List<STInstance> l){
+    	for(int z = 0; z < l.size(); z++){
+    		weka.core.Instance i = l.get(z).getInstance();
+    		i.setWeight(1);
+    		dataset.add(i);
+    	}
+    	return dataset;
     }
 
     @Override

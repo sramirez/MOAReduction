@@ -1,4 +1,4 @@
-package moa.classifiers.competence;
+package moa.classifiers;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -10,7 +10,7 @@ import jcolibri.exception.InitializingException;
 import jcolibri.extensions.classification.ClassificationSolution;
 import jcolibri.method.maintenance.CaseResult;
 import jcolibri.method.maintenance.CompetenceModel;
-import jcolibri.method.maintenance.solvesFunctions.CBESolvesFunction;
+import jcolibri.method.maintenance.solvesFunctions.ICFSolvesFunction;
 import jcolibri.method.retrieve.RetrievalResult;
 import jcolibri.method.retrieve.NNretrieval.NNScoringMethod;
 import jcolibri.method.retrieve.selection.SelectCases;
@@ -30,11 +30,13 @@ public class SRRRedundancyRemoval {
 	
 	protected KNNClassificationConfig simConfig;
 	protected int sizeLimit;
+	protected int k;
 	
 	public SRRRedundancyRemoval(KNNClassificationConfig simConfig, int sizeLimit) {
 		// TODO Auto-generated constructor stub
 		this.simConfig = simConfig;
 		this.sizeLimit = sizeLimit;
+		this.k = simConfig.getK();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -52,7 +54,8 @@ public class SRRRedundancyRemoval {
 		}
 			
 		CompetenceModel sc = new CompetenceModel();		
-		sc.computeCompetenceModel(new CBESolvesFunction(), simConfig, localCases);
+		sc.computeCompetenceModel(new ICFSolvesFunction(), simConfig, localCases);
+		simConfig.setK(this.k); // Important!
 		
 		List<CaseResult> caseReachabilitySetSizes = new LinkedList<CaseResult>();
 		for(CBRCase c : localCases){	

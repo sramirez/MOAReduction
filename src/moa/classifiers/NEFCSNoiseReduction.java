@@ -1,8 +1,9 @@
-package moa.classifiers.competence;
+package moa.classifiers;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -13,7 +14,7 @@ import jcolibri.exception.InitializingException;
 import jcolibri.extensions.classification.ClassificationSolution;
 import jcolibri.method.maintenance.CaseResult;
 import jcolibri.method.maintenance.CompetenceModel;
-import jcolibri.method.maintenance.solvesFunctions.CBESolvesFunction;
+import jcolibri.method.maintenance.solvesFunctions.ICFSolvesFunction;
 import jcolibri.method.retrieve.RetrievalResult;
 import jcolibri.method.retrieve.NNretrieval.NNScoringMethod;
 import jcolibri.method.retrieve.selection.SelectCases;
@@ -39,12 +40,14 @@ public class NEFCSNoiseReduction {
 	protected HashSet<CBRCase> deactivatedCases;
 	protected int l, sizeWindow;
 	protected float pmin, pmax, zcoef = 0.5f;
+	protected int k;
 	
 	private final int MIN_PREDICTIONS;
 	
 	public NEFCSNoiseReduction(KNNClassificationConfig simConfig, int l, int sizeWindow, float pmin, float pmax) {
 		// TODO Auto-generated constructor stub
 		this.simConfig = simConfig;
+		this.k = simConfig.getK();
 		this.l = l;
 		this.pmin = pmin;
 		this.pmax = pmax;
@@ -224,20 +227,24 @@ public class NEFCSNoiseReduction {
 	}
 	
 	private boolean solves(HashSet<CBRCase> casebase, CBRCase query){
-
-		Collection<RetrievalResult> knn = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
-		knn = SelectCases.selectTopKRR(knn, simConfig.getK());
-		try{	
-			KNNClassificationMethod classifier = ((KNNClassificationConfig) simConfig).getClassificationMethod();
-			ClassificationSolution predictedSolution = classifier.getPredictedSolution(knn);
-			ClassificationOracle oracle = new BasicClassificationOracle();
-   			
-			return oracle.isCorrectPrediction(predictedSolution, query);
-		} catch(ClassCastException cce) {	
-			cce.printStackTrace();
-			System.exit(0);
-		}
-		return false;		
+		
+		//simConfig.setK(RetrievalResult.RETRIEVE_ALL);
+		Collection<RetrievalResult> orderedRetrievedCases = NNScoringMethod.evaluateSimilarity(casebase, query, simConfig);
+		Collection<RetrievalResult> neighbors = SelectCases.selectTopKRR(orderedRetrievedCases, 1);
+		
+		ClassificationOracle oracle = new BasicClassificationOracle();
+		Iterator<RetrievalResult> iter = neighbors.iterator();
+		
+		while(iter.hasNext()) {	
+			CBRCase c = iter.next().get_case();
+			ClassificationSolution cSol = (ClassificationSolution)c.getSolution();
+			if(oracle.isCorrectPrediction(cSol, query)) {	
+				return true;
+			} else {	
+				return false;
+			}
+		}		
+		return false;
 	}
 	
 	/**
@@ -267,10 +274,8 @@ public class NEFCSNoiseReduction {
 		boolean isCorrect = oracle.isCorrectPrediction(predictedSolution, nc);
 
 		// Update l predictions for its neighbors
-		for(RetrievalResult rr: knn) {
-			boolean deactivated = deactivatedCases.contains(rr.get_case());
-			updateCS(rr.get_case(), casebase, isCorrect, deactivated);
-		}
+		for(CBRCase rr: SelectCases.selectTopK(knn, simConfig.getK()))
+			updateCS(rr, casebase, isCorrect, deactivatedCases.contains(rr));
 	}
 	
 	private void updateCS(CBRCase c, HashSet<CBRCase> casebase, boolean isCorrect, boolean isDeactivated) {
@@ -394,7 +399,8 @@ public class NEFCSNoiseReduction {
 	
 	private void updateCompetenceModel(Collection<CBRCase> cases){
 		model = new CompetenceModel();
-		model.computeCompetenceModel(new CBESolvesFunction(), simConfig, cases);
+		model.computeCompetenceModel(new ICFSolvesFunction(), simConfig, cases);
+		simConfig.setK(this.k);
 		relatedSets = computeRelatedSet(cases);
 	}
 	

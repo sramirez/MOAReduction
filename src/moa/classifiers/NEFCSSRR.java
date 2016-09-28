@@ -1,4 +1,4 @@
-package moa.classifiers.competence;
+package moa.classifiers;
 
 import java.util.Collection;
 import java.util.LinkedList;

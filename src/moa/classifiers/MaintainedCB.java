@@ -1,4 +1,4 @@
-package moa.classifiers.competence;
+package moa.classifiers;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,7 +45,7 @@ public class MaintainedCB extends AbstractClassifier {
 	public IntOption kOption = new IntOption("neighbors", 'k',
             "Number of neighbors used in search.", 3, 1, Integer.MAX_VALUE);
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 100, 1, Integer.MAX_VALUE);
+            "Size of the environments.", 500, 1, Integer.MAX_VALUE);
 
     protected long index = 0;
     protected boolean initialized = false;

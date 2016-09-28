@@ -1,13 +1,13 @@
-package moa.classifiers.competence;
+package moa.classifiers;
 
 import jcolibri.method.maintenance.TwoStepCaseBaseEditMethod;
-import jcolibri.method.maintenance.algorithms.ICFRedundancyRemoval;
-import jcolibri.method.maintenance.algorithms.ICFFull;
-import jcolibri.method.maintenance.algorithms.RENNNoiseReduction;
+import jcolibri.method.maintenance.algorithms.BBNRNoiseReduction;
+import jcolibri.method.maintenance.algorithms.CRRFull;
+import jcolibri.method.maintenance.algorithms.CRRRedundancyRemoval;
 
 /**
  * A case-base maintained by a maintenance method composed of two methods:
- * RENN and ICF.
+ * BBNR and CRR.
  *
  * @author Sergio Ramirez (sramirez at decsai dot ugr dot es)
  *
@@ -15,12 +15,12 @@ import jcolibri.method.maintenance.algorithms.RENNNoiseReduction;
  *
  */
 @SuppressWarnings("serial")
-public class ICFFullCB extends MaintainedCB {
+public class BBNRFullCB extends MaintainedCB {
 
 	@Override
 	TwoStepCaseBaseEditMethod getMaintenanceMethod() {
 		// TODO Auto-generated method stub
-		return new ICFFull(new RENNNoiseReduction(), new ICFRedundancyRemoval());
+		return new CRRFull(new BBNRNoiseReduction(), new CRRRedundancyRemoval());
 	}
 
 }

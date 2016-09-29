@@ -483,4 +483,18 @@ public class IFFDdiscretize extends Discretize
         //updateOutputFormat(index);
         
     }
+
+	@Override
+	public int getNumberIntervals() {
+		// TODO Auto-generated method stub
+		if(m_CutPoints != null) {
+			int ni = 0;
+			for(double[] cp: m_CutPoints){
+				if(cp != null)
+					ni += (cp.length + 1);
+			}
+			return ni;	
+		}
+		return 0;
+	}
 }

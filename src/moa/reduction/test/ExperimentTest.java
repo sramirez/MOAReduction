@@ -10,9 +10,9 @@ import moa.classifiers.Classifier;
 import moa.classifiers.competence.BBNRFullCB;
 import moa.classifiers.competence.ICFFullCB;
 import moa.classifiers.competence.NEFCSSRR;
-import moa.classifiers.competence.meta.FISH;
-import moa.classifiers.competence.meta.LearnNSE;
 import moa.classifiers.lazy.kNN;
+import moa.classifiers.meta.FISH;
+import moa.classifiers.meta.LearnNSE;
 import moa.core.InstanceExample;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesReduction;
@@ -28,11 +28,11 @@ public class ExperimentTest {
         		//kNN knn = new kNN();
         		//knn.kOption.setValue(3);
         		//Classifier learner = knn;
-        		Classifier learner = new ICFFullCB();
+        		Classifier learner = new BBNRFullCB();
                 
-                
-                RandomRBFGenerator stream = new RandomRBFGenerator();
-                //stream.numAttsOption.setValue(1000);
+                //RandomRBFGenerator stream = new RandomRBFGenerator();
+                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/usenet1.arff", -1);
+        		//stream.numAttsOption.setValue(1000);
                 stream.prepareForUse();
 
                 learner.setModelContext(stream.getHeader());

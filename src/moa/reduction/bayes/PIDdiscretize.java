@@ -30,6 +30,7 @@ import java.util.Map;
 import com.yahoo.labs.samoa.instances.Instance;
 
 import moa.reduction.core.MOADiscretize;
+
 import weka.core.ContingencyTables;
 import weka.core.Range;
 import weka.core.Utils;
@@ -282,64 +283,6 @@ public class PIDdiscretize implements MOADiscretize{
 	        }
 	        
       }
-  }
-
-  /**
-   * Gets the bin ranges string for an attribute
-   * 
-   * @param attributeIndex the index (from 0) of the attribute to get the bin
-   *          ranges string of
-   * @return the bin ranges string (or null if the attribute requested has been
-   *         discretized into only one interval.)
-   */
-  private String layertoString(double[] cutPoints) {
-
-    /*if (m_CutPointsL2 == null) {
-      return null;
-    }
-
-    double[] cutPoints = m_CutPointsL2[attributeIndex];*/
-
-    if (cutPoints == null) {
-      return "All";
-    }
-
-    StringBuilder sb = new StringBuilder();
-    boolean first = true;
-
-    for (int j = 0, n = cutPoints.length; j <= n; ++j) {
-      if (first) {
-        first = false;
-      } else {
-        sb.append(',');
-      }
-
-      sb.append(binRangeString(cutPoints, j, m_BinRangePrecision));
-    }
-
-    return sb.toString();
-  }
-
-  /**
-   * Get a bin range string for a specified bin of some attribute's cut points.
-   * 
-   * @param cutPoints The attribute's cut points; never null.
-   * @param j The bin number (zero based); never out of range.
-   * @param precision the precision for the range values
-   * 
-   * @return The bin range string.
-   */
-  private static String binRangeString(double[] cutPoints, int j, int precision) {
-    assert cutPoints != null;
-
-    int n = cutPoints.length;
-    assert 0 <= j && j <= n;
-
-    return j == 0 ? "" + "(" + "-inf" + "-"
-      + Utils.doubleToString(cutPoints[0], precision) + "]" : j == n ? "" + "("
-      + Utils.doubleToString(cutPoints[n - 1], precision) + "-" + "inf" + ")"
-      : "" + "(" + Utils.doubleToString(cutPoints[j - 1], precision) + "-"
-        + Utils.doubleToString(cutPoints[j], precision) + "]";
   }
 
   /**
@@ -600,5 +543,20 @@ public class PIDdiscretize implements MOADiscretize{
     
     return(instance);
   }
+  
+	@Override
+	public int getNumberIntervals() {
+		// TODO Auto-generated method stub
+		if(m_CutPointsL2 != null) {
+			int ni = 0;
+			for(double[] cp: m_CutPointsL2){
+				if(cp != null)
+					ni += (cp.length + 1);
+			}
+			return ni;	
+		}
+		return 0;
+	}
+
 
 }

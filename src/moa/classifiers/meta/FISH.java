@@ -1,4 +1,4 @@
-package moa.classifiers.competence.meta;
+package moa.classifiers.meta;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +35,7 @@ public class FISH extends AbstractClassifier {
             "Classifier to train.", Classifier.class, "lazy.IBk");
 
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 10, 10, Integer.MAX_VALUE);
+            "Size of the environments.", 500, 10, Integer.MAX_VALUE);
 
     public FloatOption distancePropOption = new FloatOption(
             "distanceProportion",
@@ -198,7 +198,7 @@ public class FISH extends AbstractClassifier {
             	}
             }
             List<STInstance> lastTrain = buffer.subList(0, min + k);
-            //System.out.println("New size to train the classifier: " + lastTrain.size());
+            System.out.println("\nNum Cases in the new casebase: " + lastTrain.size());
             trainClassifier(testClassifier, lastTrain);
     	}
     	

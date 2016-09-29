@@ -1,4 +1,4 @@
-package moa.classifiers.competence.meta;
+package moa.classifiers.meta;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -226,6 +226,7 @@ public class LearnNSE extends AbstractClassifier {
                 this.wkts.remove(errorIndex - 1);
             }
             this.buffer = new Instances(this.getModelContext());
+            System.out.println("\nNum Cases in the new casebase: " + buffer.size());
         }
     }
 

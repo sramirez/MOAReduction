@@ -481,4 +481,18 @@ public class OCdiscretize implements MOADiscretize{
 
   }
   
+	@Override
+	public int getNumberIntervals() {
+		// TODO Auto-generated method stub
+		if(interval_l != null) {
+			int ni = 0;
+			for(List<Interval> cp: interval_l){
+				if(cp != null)
+					ni += cp.size();
+			}
+			return ni;	
+		}
+		return 0;
+	}
+  
 }

@@ -141,13 +141,9 @@ public class MaintainedCB extends AbstractClassifier {
 
         if (index >= periodOption.getValue() && index % periodOption.getValue() == 0) {
         	TwoStepCaseBaseEditMethod maintenance = getMaintenanceMethod();
-    		Collection<CBRCase> deleted = maintenance.retrieveCasesToDelete(_caseBase.getCases(), wekaSimConfig);		
-    		System.out.println("\nNum Cases deleted by Alg: " + deleted.size());
-    		//System.out.println("Cases deleted by Alg: ");
-    		/*for(CBRCase c: deleted){	
-    			System.out.println(c.getID());
-    		}*/    		
-    		_caseBase.forgetCases(deleted);
+    		Collection<CBRCase> deleted = maintenance.retrieveCasesToDelete(_caseBase.getCases(), wekaSimConfig);
+    		_caseBase.forgetCases(deleted);		
+    		System.out.println("\nNum Cases in the new casebase: " + _caseBase.getCases().size());
         }
         index++;
     }

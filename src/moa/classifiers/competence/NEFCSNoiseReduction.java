@@ -215,12 +215,14 @@ public class NEFCSNoiseReduction {
 		casebase.remove(c);
 		deactivatedCases.remove(c);
 		
-		for(CBRCase query: covSet) {	
-			if(!alreadyRemoved.contains(query)) { // Line 5 (Algorithm 1) paper Li
-    			if(!solves(casebase, query)){
-    				casebase.add(c);
-    				return false;
-    			}    			
+		if(covSet != null) {
+			for(CBRCase query: covSet ) {	
+				if(!alreadyRemoved.contains(query)) { // Line 5 (Algorithm 1) paper Li
+	    			if(!solves(casebase, query)){
+	    				casebase.add(c);
+	    				return false;
+	    			}    			
+				}
 			}
 		}
 		return true;
@@ -410,8 +412,10 @@ public class NEFCSNoiseReduction {
 			try {
 				LinkedHashSet<CBRCase> cb = new LinkedHashSet<CBRCase>();
 				cb.add(c); // Important to be the first
-				cb.addAll(model.getCoverageSet(c));
-				cb.addAll(model.getReachabilitySet(c));	
+				Collection<CBRCase> cov = model.getCoverageSet(c);
+				Collection<CBRCase> reac = model.getReachabilitySet(c);
+				if(cov != null) cb.addAll(cov);
+				if(reac != null) cb.addAll(reac);
 				result.add(cb);
 			} catch (InitializingException e) {
 				// TODO Auto-generated catch block

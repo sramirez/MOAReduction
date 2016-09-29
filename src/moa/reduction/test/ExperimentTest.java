@@ -6,13 +6,13 @@ import weka.classifiers.lazy.IBk;
 
 import com.yahoo.labs.samoa.instances.Instance;
 
-import moa.classifiers.BBNRFullCB;
 import moa.classifiers.Classifier;
-import moa.classifiers.ICFFullCB;
-import moa.classifiers.NEFCSSRR;
+import moa.classifiers.competence.BBNRFullCB;
+import moa.classifiers.competence.ICFFullCB;
+import moa.classifiers.competence.NEFCSSRR;
+import moa.classifiers.competence.meta.FISH;
+import moa.classifiers.competence.meta.LearnNSE;
 import moa.classifiers.lazy.kNN;
-import moa.classifiers.meta.FISH;
-import moa.classifiers.meta.LearnNSE;
 import moa.core.InstanceExample;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesReduction;

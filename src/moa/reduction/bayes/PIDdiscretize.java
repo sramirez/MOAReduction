@@ -158,7 +158,7 @@ public class PIDdiscretize implements MOADiscretize{
   }
   
   public Instance applyDiscretization(Instance inst) {
-	  if(m_CutPointsL1 != null)
+	  if(m_CutPointsL2 != null)
 		  return convertInstance(inst);
 	  return inst;
   }
@@ -166,8 +166,8 @@ public class PIDdiscretize implements MOADiscretize{
   
   public void updateEvaluator(Instance instance) {
 	  
-	  if(m_CutPointsL1 == null) {
-		  initializeL1(instance);
+	  if(m_CutPointsL2 == null) {
+		  initializeLayers(instance);
 	  }
 	  
 	  totalCount++;
@@ -194,7 +194,7 @@ public class PIDdiscretize implements MOADiscretize{
 	  }
   }
   
-  private void initializeL1(Instance inst){
+  private void initializeLayers(Instance inst){
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
 	  step = (max - min) / (double) initialBinsL1;
 	  m_CutPointsL1 = new ArrayList<List<Double>>(inst.numAttributes());
@@ -214,6 +214,7 @@ public class PIDdiscretize implements MOADiscretize{
 		  m_Counts.add(new ArrayList<Float>(Arrays.asList(initialc)));
 		  m_Distrib.add(initiald);			  
 	  }  
+	  initL2FromL1();
   }
   
   private void updateLayer2(Instance instance) {
@@ -235,6 +236,16 @@ public class PIDdiscretize implements MOADiscretize{
       }
     }
 	
+  }
+  
+  private void initL2FromL1() {
+	  m_CutPointsL2 = new double[m_CutPointsL1.size()][];
+	  for (int i = 0; i < m_CutPointsL1.size(); i++) {
+		  m_CutPointsL2[i] = new double[m_CutPointsL1.get(i).size()];
+		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
+			  m_CutPointsL2[i][j] = m_CutPointsL1.get(i).get(j);
+		  } 
+	  }	  
   }
 
   private void updateLayer1(Instance inst, int index) {
@@ -280,6 +291,7 @@ public class PIDdiscretize implements MOADiscretize{
 	        		m_Counts.get(index).add(k + 1, tmp);
 	        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
 	        	}
+	        	initL2FromL1();
 	        }
 	        
       }
@@ -495,7 +507,7 @@ public class PIDdiscretize implements MOADiscretize{
         && instance.attribute(i).isNumeric()) {
         int j;
         double currentVal = instance.value(i);
-        if (m_CutPointsL1.get(i) == null) {
+        if (m_CutPointsL2[i] == null) {
           if (instance.isMissing(i)) {
             vals[index] = Utils.missingValue();
             instance.setValue(index, Utils.missingValue());
@@ -510,8 +522,8 @@ public class PIDdiscretize implements MOADiscretize{
               vals[index] = Utils.missingValue();
               instance.setValue(index, Utils.missingValue());
             } else {
-              for (j = 0; j < m_CutPointsL1.get(i).size(); j++) {
-                if (currentVal <= m_CutPointsL1.get(i).get(j)) {
+              for (j = 0; j < m_CutPointsL2[i].length; j++) {
+                if (currentVal <= m_CutPointsL2[i][j]) {
                   break;
                 }
               }
@@ -520,11 +532,11 @@ public class PIDdiscretize implements MOADiscretize{
             }
             index++;
           } else {
-            for (j = 0; j < m_CutPointsL1.get(i).size(); j++) {
+            for (j = 0; j < m_CutPointsL2[i].length; j++) {
               if (instance.isMissing(i)) {
                 vals[index] = Utils.missingValue();
                 instance.setValue(index, Utils.missingValue());
-              } else if (currentVal <= m_CutPointsL1.get(i).get(j)) {
+              } else if (currentVal <= m_CutPointsL2[i][j]) {
                 vals[index] = 0;
                 instance.setValue(index, 0);
               } else {

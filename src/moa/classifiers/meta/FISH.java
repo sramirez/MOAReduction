@@ -48,24 +48,12 @@ public class FISH extends AbstractClassifier {
     protected Classifier testClassifier;
     protected List<STInstance> buffer;
     protected long index = 0;
-    protected double distanceProp;
-    protected int k, period;
     protected int classIndex;
     protected weka.core.Instances emptyDataset;
   
 
     @Override
-    public void resetLearningImpl() {
-        this.index = 0;
-        this.buffer = null;
-        this.period = this.periodOption.getValue();
-        this.distanceProp = this.distancePropOption.getValue();
-        this.k = this.kOption.getValue();
-        this.testClassifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
-		if(testClassifier instanceof kNN){
-			((kNN) testClassifier).kOption.setValue(kOption.getValue());
-		}
-    }
+    public void resetLearningImpl() { }
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
@@ -74,6 +62,11 @@ public class FISH extends AbstractClassifier {
         if (this.buffer == null) {
             this.buffer = new LinkedList<STInstance>();
             this.classIndex = inst.classIndex();
+            
+            this.testClassifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
+    		if(testClassifier instanceof kNN){
+    			((kNN) testClassifier).kOption.setValue(kOption.getValue());
+    		}
 
         	ArrayList<Attribute> list = new ArrayList<Attribute>();
     		for(int i = 0; i < inst.numAttributes(); i++) 
@@ -152,8 +145,8 @@ public class FISH extends AbstractClassifier {
             
             // Normalize distances
             for (int j = 0; j < time.length; j++) {
-            	float distance = (float) ((1 - distanceProp) * space[j] / maxSpace + 
-            			distanceProp * time[j] / this.index);
+            	float distance = (float) ((1 - this.distancePropOption.getValue()) * space[j] / maxSpace + 
+            			this.distancePropOption.getValue() * time[j] / this.index);
             	buffer.get(j).setDistance(distance);
 			}
             
@@ -162,11 +155,11 @@ public class FISH extends AbstractClassifier {
             
             List<Double> measurements = new LinkedList<Double>();
 			// Apply leave-one-out cross validation (validation set formed by top-k nearest neighbors)
-            for (int i = k; i < buffer.size(); i++){
+            for (int i = this.kOption.getValue(); i < buffer.size(); i++){
             	try {
             		weka.core.Instances train = listToWInstances(new weka.core.Instances(emptyDataset), buffer.subList(0, i));            		
 	            	double errors = 0;
-	            	for(int j = 0; j < k ; j++) {
+	            	for(int j = 0; j < this.kOption.getValue() ; j++) {
 		            	// Validation instance is removed from the training set for this run
 	            		weka.core.Instance removed = train.remove(j);
 	            		// Train for the tuple i, j
@@ -181,7 +174,7 @@ public class FISH extends AbstractClassifier {
 	                	// We add the skipped instance again
 	            		train.add(j, removed);
 	            	}
-                	measurements.add(errors / k);
+                	measurements.add(errors / this.kOption.getValue());
 	            	
             	} catch (Exception e) {
 					// TODO Auto-generated catch block
@@ -197,8 +190,14 @@ public class FISH extends AbstractClassifier {
             		minval = measurements.get(i);
             	}
             }
-            List<STInstance> lastTrain = buffer.subList(0, min + k);
+            List<STInstance> lastTrain = buffer.subList(0, min + this.kOption.getValue());
             System.out.println("\nNum Cases in the new casebase: " + lastTrain.size());
+            if(testClassifier == null){
+            	this.testClassifier = ((Classifier) getPreparedClassOption(this.baseLearnerOption));
+        		if(testClassifier instanceof kNN){
+        			((kNN) testClassifier).kOption.setValue(kOption.getValue());
+        		}
+            }
             trainClassifier(testClassifier, lastTrain);
     	}
     	

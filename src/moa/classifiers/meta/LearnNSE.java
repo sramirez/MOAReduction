@@ -42,7 +42,7 @@ public class LearnNSE extends AbstractClassifier {
             "Number of neighbors.", 3, 1, 50);
 
     public IntOption periodOption = new IntOption("period", 'p',
-            "Size of the environments.", 100, 1, Integer.MAX_VALUE);
+            "Size of the environments.", 500, 1, Integer.MAX_VALUE);
 
     public FloatOption sigmoidSlopeOption = new FloatOption(
             "sigmoidSlope",
@@ -71,8 +71,6 @@ public class LearnNSE extends AbstractClassifier {
     protected List<ArrayList<Double>> bkts, wkts;
     protected Instances buffer;
     protected long index;
-    protected double slope, crossingPoint;
-    protected int pruning, ensembleSize;
     
     public LearnNSE() {
 		// TODO Auto-generated constructor stub
@@ -87,10 +85,6 @@ public class LearnNSE extends AbstractClassifier {
         this.wkts = new ArrayList<>();
         this.index = 0;
         this.buffer = null;
-        this.slope = this.sigmoidSlopeOption.getValue();
-        this.crossingPoint = this.sigmoidCrossingPointOption.getValue();
-        this.pruning = this.pruningStrategyOption.getChosenIndex();
-        this.ensembleSize = this.ensembleSizeOption.getValue();
     }
 
     @Override
@@ -198,8 +192,8 @@ public class LearnNSE extends AbstractClassifier {
                 nbkt.add(bkt);
 				// Compute the weighted average of all normalized errors for kth
                 // classifier h_k
-                double wkt = 1.0 / (1.0 + Math.exp(-this.slope
-                        * (t - k - this.crossingPoint)));
+                double wkt = 1.0 / (1.0 + Math.exp(-this.sigmoidSlopeOption.getValue()
+                        * (t - k - this.sigmoidCrossingPointOption.getValue())));
                 List<Double> weights = this.wkts.get(k - 1);
                 double sum = 0;
                 for (Double weight : weights) {
@@ -214,12 +208,14 @@ public class LearnNSE extends AbstractClassifier {
                 this.ensembleWeights.add(Math.log(1.0 / sbkt));
             }
             // Ensemble pruning strategy				
-            if (pruning == 1 && t > ensembleSize) { // Age-based
+            if (this.pruningStrategyOption.getChosenIndex() == 1 && 
+            		t > this.ensembleSizeOption.getValue()) { // Age-based
                 this.ensemble.remove(0);
                 this.ensembleWeights.remove(0);
                 this.bkts.remove(0);
                 this.wkts.remove(0);
-            } else if (pruning == 2 && t > ensembleSize) { // Error-based
+            } else if (this.pruningStrategyOption.getChosenIndex() == 2 && 
+            		t > this.ensembleSizeOption.getValue()) { // Error-based
                 this.ensemble.remove(errorIndex - 1);
                 this.ensembleWeights.remove(errorIndex - 1);
                 this.bkts.remove(errorIndex - 1);

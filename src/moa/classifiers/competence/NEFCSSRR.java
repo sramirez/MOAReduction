@@ -44,12 +44,9 @@ public class NEFCSSRR extends MaintainedCB {
 	TwoStepCaseBaseEditMethod getMaintenanceMethod() {
 		// TODO Auto-generated method stub
 		return null;
-	}
+	}	
 	
-	
-	public NEFCSSRR() {
-		// TODO Auto-generated constructor stub
-		super();
+	public void initializeCBE() {
         // Configure KNN
    		wekaSimConfig = new KNNClassificationConfig();   		
    		wekaSimConfig.setDescriptionSimFunction(new Average());
@@ -83,13 +80,16 @@ public class NEFCSSRR extends MaintainedCB {
         //Store immediately the instance in the case-base during the first round  
     	if(index < periodOption.getValue()) {
     		if(!initialized) {
-    			initialized = true;
+    			
+    			initializeCBE();
     			initializeDataset(inst); 
             	winst.setDataset(emptyDataset);
             	
             	List<weka.core.Instance> l = new LinkedList<weka.core.Instance>();
             	l.add(winst);
-            	initCaseBase(l);	
+            	initCaseBase(l);            	
+
+    			initialized = true;
             	
             } else {            	            	
         		List<CBRCase> l = new LinkedList<CBRCase>();

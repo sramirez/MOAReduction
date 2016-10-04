@@ -88,24 +88,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
     protected int totalCount = 0;
     protected Set<Integer> selectedFeatures = new HashSet<Integer>();
     
-    public NaiveBayesReduction () {    	
-    	if(fsmethodOption.getValue() == 3) {
-    		fselector = new OFSGDAttributeEval(numFeaturesOption.getValue());
-    	} else if (fsmethodOption.getValue() == 2 || fsmethodOption.getValue() == 1){
-    		fselector = new IncrInfoThAttributeEval(fsmethodOption.getValue());
-    	} else {
-    		//fselector = null;
-    	}
-    	
-    	if(discmethodOption.getValue() == 1) {
-    		discretizer = new PIDdiscretize();
-    	} else if(discmethodOption.getValue() == 2) {
-    		discretizer = new IFFDdiscretize();	
-    	} else if(discmethodOption.getValue() == 3) {
-    		discretizer = new OCdiscretize();
-    	}
-    }
-
     @Override
     public void resetLearningImpl() {
 	    this.observedClassDistribution = new DoubleVector();
@@ -117,6 +99,15 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	
     	Instance rinst = inst;
     	if(fsmethodOption.getValue() != 0) {
+    		if(fselector == null) {
+    			if(fsmethodOption.getValue() == 3) {
+    	    		fselector = new OFSGDAttributeEval(numFeaturesOption.getValue());
+    	    	} else if (fsmethodOption.getValue() == 2 || fsmethodOption.getValue() == 1){
+    	    		fselector = new IncrInfoThAttributeEval(fsmethodOption.getValue());
+    	    	} else {
+    	    		//fselector = null;
+    	    	}
+    		}
     		try {
     			if(inst == null) {
     				System.err.println("Error: null instance");
@@ -129,6 +120,15 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	}
 	    	
     	if(discmethodOption.getValue() != 0) {
+    		if(discretizer == null) {
+    			if(discmethodOption.getValue() == 1) {
+    	    		discretizer = new PIDdiscretize();
+    	    	} else if(discmethodOption.getValue() == 2) {
+    	    		discretizer = new IFFDdiscretize();	
+    	    	} else if(discmethodOption.getValue() == 3) {
+    	    		discretizer = new OCdiscretize();
+    	    	}
+    		}
     		discretizer.updateEvaluator(inst);
     		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
@@ -252,9 +252,9 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	
     	// Feature selection process performed before
     	Instance sinst = inst;
-    	if(fsmethodOption.getValue() != 0) 
+    	if(fsmethodOption.getValue() != 0 && fselector != null) 
     		performFS(sinst);
-    	if(discmethodOption.getValue() != 0) 
+    	if(discmethodOption.getValue() != 0 && discretizer != null) 
     		sinst = discretizer.applyDiscretization(sinst);
 		
 		// Naive Bayes predictions

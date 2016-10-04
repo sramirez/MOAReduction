@@ -75,13 +75,13 @@ public class NaiveBayesReduction extends AbstractClassifier {
     protected AutoExpandVector<AttributeClassObserver> attributeObservers;
 
     public static IntOption numFeaturesOption = new IntOption("numFeatures", 'f', 
-    		"The number of features to select", 25, 1, Integer.MAX_VALUE);
+    		"The number of features to select", 10, 1, Integer.MAX_VALUE);
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 3, 0, 3);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
-    		"Window size for model updates", 1000, 1, Integer.MAX_VALUE);    
+    		"Window size for model updates", 1, 1, Integer.MAX_VALUE);    
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
@@ -118,6 +118,9 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	Instance rinst = inst;
     	if(fsmethodOption.getValue() != 0) {
     		try {
+    			if(inst == null) {
+    				System.err.println("Error: null instance");
+    			}
 				fselector.updateEvaluator(inst);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
@@ -130,7 +133,10 @@ public class NaiveBayesReduction extends AbstractClassifier {
     		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
     	}
-    	
+    	if(rinst.classValue() == -1)
+    	{
+    		System.out.println();
+    	}
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
             int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
@@ -140,7 +146,14 @@ public class NaiveBayesReduction extends AbstractClassifier {
                         : newNumericClassObserver();
                 this.attributeObservers.set(i, obs);
             }
-            obs.observeAttributeClass(rinst.value(instAttIndex), (int) rinst.classValue(), rinst.weight());
+            
+            // Problem with spam assasin
+            double value = rinst.value(instAttIndex);
+            if(rinst.value(instAttIndex) == -1) {
+            	System.out.println("Value changed");
+            	value = 0;            	
+            }
+            obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
         }
         
         totalCount++;

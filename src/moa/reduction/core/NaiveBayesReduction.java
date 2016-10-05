@@ -79,9 +79,11 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 2, 0, 3);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
-    		"Window size for model updates", 1, 1, Integer.MAX_VALUE);    
+    		"Window size for model updates", 1, 1, Integer.MAX_VALUE);  
+    public IntOption numClassesOption = new IntOption("numClasses", 'c', 
+    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
@@ -126,7 +128,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    	} else if(discmethodOption.getValue() == 2) {
     	    		discretizer = new IFFDdiscretize();	
     	    	} else if(discmethodOption.getValue() == 3) {
-    	    		discretizer = new OCdiscretize();
+    	    		discretizer = new OCdiscretize(this.numClassesOption.getValue());
     	    	}
     		}
     		discretizer.updateEvaluator(inst);
@@ -135,7 +137,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	}
     	if(rinst.classValue() == -1)
     	{
-    		System.out.println();
+    		System.out.println("Error");
     	}
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {

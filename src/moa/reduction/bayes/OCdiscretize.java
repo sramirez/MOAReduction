@@ -55,33 +55,36 @@ public class OCdiscretize implements MOADiscretize{
   protected float totalCount;
   
   protected ArrayList<TreeMap<Double, Bin>> trees;  
-  protected List<Iterator<Double>> it_bin;
+  protected List<LinkedList<Double>> it_bin;
   protected List<Bin> previous_bin;
   protected List<Interval> last_interval;  
   protected List<PriorityQueue<Interval>> interval_q;
   protected List<List<Interval>> interval_l;
+  protected List<List<Interval>> interval_l2;
   protected List<LinkedList<Pair>> example_q;
   protected int[] phases;
   protected int initialElements = 100;
+  protected int numClasses = 2;
 
   /** Output binary attributes for discretized attributes. */
   protected boolean m_MakeBinary = false;
 
   /** Constructor - initializes the filter */
-  public OCdiscretize() {
+  public OCdiscretize(int nc) {
+	  this.numClasses = nc;
 	  m_DiscretizeCols = new Range();	  
 	  totalCount = 0;
 	  trees = null;
 	  setAttributeIndices("first-last");
   }
   
-  public OCdiscretize(int[] attributes) {
-	  this();
+  public OCdiscretize(int numClasses, int[] attributes) {
+	  this(numClasses);
 	  setAttributeIndicesArray(attributes);
   }
   
-  public OCdiscretize(int initial) {
-	  this();
+  public OCdiscretize(int numClasses, int initial) {
+	  this(numClasses);
 	  this.initialElements = initial;
   }
   
@@ -134,13 +137,13 @@ public class OCdiscretize implements MOADiscretize{
    */
   public double[] getCutPoints(int attributeIndex) {
 
-    if (interval_l == null) {
+    if (interval_l2 == null) {
       return null;
     }
     
-    double[] cutpoints = new double[interval_l.get(attributeIndex).size()];
+    double[] cutpoints = new double[interval_l2.get(attributeIndex).size()];
     for (int i = 0; i < cutpoints.length; i++) {
-		cutpoints[i] = interval_l.get(attributeIndex).get(i).lower;
+		cutpoints[i] = interval_l2.get(attributeIndex).get(i).lower;
 	}
     return cutpoints;
   }
@@ -178,8 +181,9 @@ public class OCdiscretize implements MOADiscretize{
 	  trees = new ArrayList<TreeMap<Double, Bin>>(inst.numAttributes());
 	  interval_q = new ArrayList<PriorityQueue<Interval>>();
 	  interval_l = new ArrayList<List<Interval>>();
+	  interval_l2 = new ArrayList<List<Interval>>();
 	  example_q = new ArrayList<LinkedList<Pair>>();
-	  it_bin = new ArrayList<Iterator<Double>>();
+	  it_bin = new ArrayList<LinkedList<Double>>();
 	  previous_bin = new ArrayList<Bin>();
 	  last_interval = new ArrayList<Interval>();
 	  
@@ -189,8 +193,9 @@ public class OCdiscretize implements MOADiscretize{
 		  phases[i] = 0;
 		  interval_q.add(new PriorityQueue<Interval>());
 		  interval_l.add(new ArrayList<Interval>());
+		  interval_l2.add(new ArrayList<Interval>());
 		  example_q.add(new LinkedList<Pair>());
-		  it_bin.add(Collections.<Double>emptyList().iterator());
+		  it_bin.add(new LinkedList<Double>());
 		  previous_bin.add(new Bin());
 		  last_interval.add(new Interval());		  
 	  }  
@@ -199,20 +204,14 @@ public class OCdiscretize implements MOADiscretize{
   private void OnlineChiMerge(int index, Instance inst){
 	  
 	  double value = inst.value(index);
-	  if(phases[index] == 0){
-		  addToMainTree(index, inst.value(index), inst.classValue(), inst.numAttributes());
-		  
-		  if(totalCount >= initialElements){
-			  it_bin.set(index, trees.get(index).navigableKeySet().iterator());
-			  previous_bin.set(index, trees.get(index).lastEntry().getValue());
-			  interval_q.set(index, new PriorityQueue<Interval>(trees.get(index).size() - 1));
-			  phases[index] = 1;
-		  }
-	  } else if (phases[index] == 1) {
-		  
+	  if(phases[index] != 1) addToMainTree(index, value, inst.classValue());		
+	  
+	  if(phases[index] == 0){		    
+		  if(totalCount >= initialElements) reInit(index); // go to next phase
+	  } else if (phases[index] == 1) {		  
 		  example_q.get(index).add(new Pair(value, inst.classValue()));
-		  if(it_bin.get(index).hasNext()) {
-			  double key = it_bin.get(index).next();
+		  if(!it_bin.get(index).isEmpty()) {
+			  double key = it_bin.get(index).pollFirst();
 			  Bin cbin = trees.get(index).get(key);
 			  if(interval_l.get(index).isEmpty()){
 				  double minus_inf = Float.NEGATIVE_INFINITY;
@@ -231,23 +230,20 @@ public class OCdiscretize implements MOADiscretize{
 		  } else {
 			  phases[index] = 2;
 		  }
-	  } else if (phases[index] == 2) {
-		  addToMainTree(index, inst.value(index), inst.classValue(), inst.numAttributes());
-		  
-		  Pair pel = example_q.get(index).pollLast();
-		  
-		  addToMainTree(index, pel.value, pel.clas, inst.numAttributes());
+	  } else if (phases[index] == 2) {		  
+		  Pair pel = example_q.get(index).pollLast();		  
+		  addToMainTree(index, pel.value, pel.clas);
 		  
 		  Interval[] tmp = new Interval[interval_q.get(index).size()];
 		  Interval[] array = interval_q.get(index).toArray(tmp);
 
+		  Interval next = array[0]; 
+		  interval_q.get(index).remove(next);			  
+		  interval_l.get(index).remove(next);
+
 		  if(array.length > 1) {
-			  Interval next = array[0];
 			  Interval best = array[1];
-			  best.merge(next);
-			  
-			  interval_q.get(index).remove(next);			  
-			  interval_l.get(index).remove(next);			  
+			  best.merge(next);		  
 			  
 			  if(interval_l.get(index).size() > 2){ // There are more elements
 				  next = array[2];
@@ -263,28 +259,38 @@ public class OCdiscretize implements MOADiscretize{
 				  interval_q.get(index).remove(prev);
 				  interval_q.get(index).offer(prev);
 			  }			  
-		  } else {
-			  Interval next = array[0];			  
-			  interval_q.get(index).remove(next);			  
-			  interval_l.get(index).remove(next);			  
-			  
+		  } else {		  
 			  if(interval_q.get(index).isEmpty()){
 				  Pair p = example_q.get(index).pollLast();
-				  addToMainTree(index, p.value, p.clas, inst.numAttributes());
+				  addToMainTree(index, p.value, p.clas);
 				  phases[index] = 3;
-			  }
-			  
-			  
+			  }		  
 		  }
 	  } else { // phase = 3
-		  addToMainTree(index, value, inst.classValue(), inst.numAttributes());
+		  if(interval_l.get(index).size() > 0) {
+			  Interval e = interval_l.get(index).remove(0);
+			  interval_l2.get(index).add(e);
+			  if(example_q.get(index).isEmpty()){
+				  reInit(index);
+			  }
+		  }
 	  }	
   }
   
-  private void addToMainTree(int index, double value, double clas, int na){
-	  Bin bin = trees.get(index).getOrDefault(value, new Bin(value, na));
+  private void addToMainTree(int index, double value, double clas){
+	  Bin bin = trees.get(index).getOrDefault(value, new Bin(value));
 	  bin.feed((int) clas);
 	  trees.get(index).put(value, bin);
+	  it_bin.get(index).add(value);
+  }
+  
+  private void reInit(int index){	  
+	  it_bin.get(index).addAll(index, trees.get(index).navigableKeySet());
+	  previous_bin.set(index, trees.get(index).lastEntry().getValue());
+	  int tam = trees.get(index).size() - 1;
+	  if(tam < 1) tam = 1; 
+	  interval_q.set(index, new PriorityQueue<Interval>(tam));
+	  phases[index] = 1;
   }
   
   
@@ -339,7 +345,7 @@ public class OCdiscretize implements MOADiscretize{
         && instance.attribute(i).isNumeric()) {
         int j;
         double currentVal = instance.value(i);
-        if (interval_l.get(i) == null) {
+        if (interval_l2.get(i) == null) {
           if (instance.isMissing(i)) {
             vals[index] = Utils.missingValue();
             instance.setValue(index, Utils.missingValue());
@@ -354,8 +360,8 @@ public class OCdiscretize implements MOADiscretize{
               vals[index] = Utils.missingValue();
               instance.setValue(index, Utils.missingValue());
             } else {
-              for (j = 0; j < interval_l.get(i).size(); j++) {
-                if (currentVal <= interval_l.get(i).get(j).lower) {
+              for (j = 0; j < interval_l2.get(i).size(); j++) {
+                if (currentVal <= interval_l2.get(i).get(j).lower) {
                   break;
                 }
               }
@@ -364,11 +370,11 @@ public class OCdiscretize implements MOADiscretize{
             }
             index++;
           } else {
-            for (j = 0; j < interval_l.get(i).size(); j++) {
+            for (j = 0; j < interval_l2.get(i).size(); j++) {
               if (instance.isMissing(i)) {
                 vals[index] = Utils.missingValue();
                 instance.setValue(index, Utils.missingValue());
-              } else if (currentVal <= interval_l.get(i).get(j).lower) {
+              } else if (currentVal <= interval_l2.get(i).get(j).lower) {
                 vals[index] = 0;
                 instance.setValue(index, 0);
               } else {
@@ -405,10 +411,10 @@ public class OCdiscretize implements MOADiscretize{
 	    int[] distrib;
 
 	    public Bin(){
-	    	this(Double.NEGATIVE_INFINITY, 1);
+	    	this(Double.NEGATIVE_INFINITY);
 	    }
 	    
-	    public Bin(double value, int numClasses) {
+	    public Bin(double value) {
 	    	this.value = value;
 	    	distrib = new int[numClasses];
 	    	for(int i = 0; i < numClasses; ++i)
@@ -484,9 +490,9 @@ public class OCdiscretize implements MOADiscretize{
 	@Override
 	public int getNumberIntervals() {
 		// TODO Auto-generated method stub
-		if(interval_l != null) {
+		if(interval_l2 != null) {
 			int ni = 0;
-			for(List<Interval> cp: interval_l){
+			for(List<Interval> cp: interval_l2){
 				if(cp != null)
 					ni += cp.size();
 			}

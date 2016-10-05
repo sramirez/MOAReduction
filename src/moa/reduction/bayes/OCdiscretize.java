@@ -237,12 +237,11 @@ public class OCdiscretize implements MOADiscretize{
 		  Interval[] tmp = new Interval[interval_q.get(index).size()];
 		  Interval[] array = interval_q.get(index).toArray(tmp);
 
-		  Interval next = array[0]; 
-		  interval_q.get(index).remove(next);			  
-		  interval_l.get(index).remove(next);
-
 		  if(array.length > 1) {
-			  Interval best = array[1];
+			  Interval best = array[0]; 
+			  Interval next = array[1];
+			  interval_q.get(index).remove(next);			  
+			  interval_l.get(index).remove(next);
 			  best.merge(next);		  
 			  
 			  if(interval_l.get(index).size() > 2){ // There are more elements
@@ -264,7 +263,12 @@ public class OCdiscretize implements MOADiscretize{
 				  Pair p = example_q.get(index).pollLast();
 				  addToMainTree(index, p.value, p.clas);
 				  phases[index] = 3;
-			  }		  
+			  } else {
+				  // Only one element left
+				  Interval best = array[0]; 
+				  interval_q.get(index).remove(best);			  
+				  interval_l.get(index).remove(best);
+			  }
 		  }
 	  } else { // phase = 3
 		  if(interval_l.get(index).size() > 0) {
@@ -286,7 +290,8 @@ public class OCdiscretize implements MOADiscretize{
   
   private void reInit(int index){	  
 	  it_bin.get(index).addAll(index, trees.get(index).navigableKeySet());
-	  previous_bin.set(index, trees.get(index).lastEntry().getValue());
+	  double lastKey = it_bin.get(index).peekLast();
+	  previous_bin.set(index, trees.get(index).get(lastKey));
 	  int tam = trees.get(index).size() - 1;
 	  if(tam < 1) tam = 1; 
 	  interval_q.set(index, new PriorityQueue<Interval>(tam));

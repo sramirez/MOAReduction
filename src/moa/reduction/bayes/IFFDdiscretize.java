@@ -5,6 +5,7 @@ package moa.reduction.bayes;
  */
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,7 +50,7 @@ public class IFFDdiscretize extends Discretize
 	 * 
 	 */
 	/** Stores which columns to Discretize */
-	protected Range m_DiscretizeCols = new Range();
+	protected Range m_DiscretizeCols = new Range("first-last");
 	
 	protected Set<Integer> classes = new TreeSet<Integer>();
 	
@@ -96,6 +97,7 @@ public class IFFDdiscretize extends Discretize
     		m_IntervalFrequency = new int [instance.numAttributes()] [];
             m_leftDistribution= new int [instance.numAttributes()] [];
             m_rightDistribution = new int [instance.numAttributes()] [];
+            m_CutPoints = new double [instance.numAttributes()] []; 
             m_AttributeClassPairs= new ArrayList<SortedMap<Double, List<Integer>>> (instance.numAttributes());
             
             for(int i = instance.numAttributes() - 1; i >= 0; i--) {
@@ -104,6 +106,7 @@ public class IFFDdiscretize extends Discretize
                         (instance.classIndex() != i)) {
                     TreeMap<Double, List<Integer>> map = new TreeMap<Double, List<Integer>>();
                     m_AttributeClassPairs.add(map);
+                    m_IntervalFrequency[i] = new int[1];
                 }
             }
     	}
@@ -295,10 +298,16 @@ public class IFFDdiscretize extends Discretize
         end = start+m_IntervalFrequency[index][splitinterval]+1;
         
         //data.delete(data.numInstances()-1);
-        Set<Map.Entry<Double, List<Integer>>> attbuteClassPairs = m_AttributeClassPairs.get(index).entrySet();
-        Map.Entry<Double, List<Integer>>[] pairs = (Entry<Double, List<Integer>>[]) attbuteClassPairs.toArray();
-        if(pairs[start].getKey() ==
-        		pairs[end - 1].getKey()) {
+        LinkedList<Map.Entry<Double, List<Integer>>> pairs = new LinkedList<Map.Entry<Double, List<Integer>>>();
+        //Map.Entry<Double, List<Integer>>[] pairs = (Entry<Double, List<Integer>>[]) attbuteClassPairs.toArray();
+        
+        for(Map.Entry<Double, List<Integer>> e: m_AttributeClassPairs.get(index).entrySet())
+        	pairs.add(e);
+        
+        
+        
+        if(pairs.get(start).getKey() ==
+        		pairs.get(end - 1).getKey()) {
             if(m_Debug)
                 System.err.println("This interval can not split,"
                         +"all instances in the interval have the same value for attribute");
@@ -311,12 +320,19 @@ public class IFFDdiscretize extends Discretize
         int numOfInstances = 0;
         
         
-        int [] classInstance=new int[classes.size()];
+        int max = Integer.MIN_VALUE;
+
+        for (int d : classes) {
+           if (d > max) max = d;
+        }
+
+        int [] classInstance=new int[max + 1];
+        
         for( i = start; i < end; i++) {
             //if(data.instance(i).isMissing(index))
             //if(attbuteClassPairs.attributeClassPair(i).isMissing())
             //    break;
-        	List<Integer> classes = pairs[start].getValue();
+        	List<Integer> classes = pairs.get(start).getValue();
         	for (Integer clas : classes) {
         		classInstance[clas]++;
                 sumOfWeights ++;
@@ -342,18 +358,18 @@ public class IFFDdiscretize extends Discretize
             middle ++;
             mcount++;
         }
-        double midval = pairs[mcount].getKey();
+        double midval = pairs.get(mcount).getKey();
         
         int n = -1;
         double nweight = 0;
         // if middle val same as last there's no place above middle to make cut
-        if(midval != pairs[end - 1].getKey()){
+        if(midval != pairs.get(end - 1).getKey()){
             
             // find the first different value to the right   ******
             //for(n = middle + 1; n < numOfInstances; n++) {
             for(n = mcount + 1; n < end; n++) {
                 nweight ++;
-                if(midval != pairs[n].getKey())
+                if(midval != pairs.get(n).getKey())
                     break;  // found place for cut
             }
         }
@@ -373,13 +389,13 @@ public class IFFDdiscretize extends Discretize
         // find first diff val to left only if midval and first val aren't same
         // && n is more than one away from midpoint (if n is 1 we go with that
         // so don't bother finding m)
-        if((midval != pairs[start].getKey()) && n > 1) {
+        if((midval != pairs.get(start).getKey()) && n > 1) {
             // find the first different value to the left
             //for(m = middle - 1; m > -1; m--) { ******
             //for(m = mcount - 1; m > -1; m--) {
             for(m = mcount - 1; m > start-1; m--) {
                 mweight ++;
-                if(midval != pairs[m].getKey()) {
+                if(midval != pairs.get(m).getKey()) {
                     // mcut = (int)data.instance(m).value(index);
                     break;  // found place for cut
                 }
@@ -391,13 +407,13 @@ public class IFFDdiscretize extends Discretize
             newcutpoint = midval;
             //newcutpoint=attbuteClassPairs.attributeClassPair(mcount+n-1).getAttributeValue();
         } else{
-            newcutpoint = pairs[m].getKey();
+            newcutpoint = pairs.get(m).getKey();
         }
         
         
         // set cutpoint array for this attribute (with a single cut)
         
-        for(j=start; pairs[j].getKey() <= newcutpoint;j++)
+        for(j=start; pairs.get(j).getKey() <= newcutpoint;j++)
             leftIntervalFrequency++;
         
         if((leftIntervalFrequency<m_MinBinSize || end-start-leftIntervalFrequency<m_MinBinSize) && m_CutPoints[index]!=null){
@@ -414,9 +430,8 @@ public class IFFDdiscretize extends Discretize
             }
         }
          */
-        
-        m_leftDistribution[index]=new int [classes.size()];
-        m_rightDistribution[index]=new int [classes.size()];
+        m_leftDistribution[index]=new int [max + 1];
+        m_rightDistribution[index]=new int [max + 1];
         /*
         for(i=0;i<numClass;i++){
             m_leftDistribution[index][i]=0;
@@ -424,7 +439,7 @@ public class IFFDdiscretize extends Discretize
         }
          */
         for(i=start;i<start+leftIntervalFrequency;i++){
-        	List<Integer> classes = pairs[i].getValue();
+        	List<Integer> classes = pairs.get(i).getValue();
         	for (Integer clas : classes) {
         		m_leftDistribution[index][clas]++;
 			} 
@@ -432,7 +447,7 @@ public class IFFDdiscretize extends Discretize
         }
         
         for(;i<end;i++){
-        	List<Integer> classes = pairs[i].getValue();
+        	List<Integer> classes = pairs.get(i).getValue();
         	for (Integer clas : classes) {
         		m_rightDistribution[index][clas]++;
 			}
@@ -475,8 +490,8 @@ public class IFFDdiscretize extends Discretize
         }
         
         if (m_ChangedAttributes==null){
-            m_ChangedAttributes=new int [numAttribute-1];
-            for(i=0;i<numAttribute-1;i++)
+            m_ChangedAttributes=new int [numAttribute];
+            for(i=0;i<numAttribute;i++)
                 m_ChangedAttributes[i]=-1;
         }
         m_ChangedAttributes[index]=splitinterval;

@@ -57,10 +57,10 @@ public class PIDdiscretize implements MOADiscretize{
 		
 	protected double max = 1;
 	
-	protected int initialBinsL1 = 200;
+	protected int initialBinsL1 = 500;
   
 	/** Instance limit before starting the splitting process */
-	protected int initialElements = 1000;
+	protected int initialElements = 100;
 	
   /** Stores which columns to Discretize */  
   protected Range m_DiscretizeCols = new Range();
@@ -183,14 +183,6 @@ public class PIDdiscretize implements MOADiscretize{
     
 	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
 		  updateLayer2(instance);
-		  //System.out.println("New layer 2\n\n");	  
-		  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-  	      if ((m_DiscretizeCols.isInRange(i))
-  	        && (instance.attribute(i).isNumeric())
-  	        && (instance.classIndex() != i)) {
-  	    	  //System.out.println(layertoString(m_CutPointsL2[i]));  	    	  	    	  
-  	      }
-  	    }
 	  }
   }
   
@@ -291,7 +283,6 @@ public class PIDdiscretize implements MOADiscretize{
 	        		m_Counts.get(index).add(k + 1, tmp);
 	        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
 	        	}
-	        	initL2FromL1();
 	        }
 	        
       }

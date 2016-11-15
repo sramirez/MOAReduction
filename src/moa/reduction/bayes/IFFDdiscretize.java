@@ -8,18 +8,15 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import com.yahoo.labs.samoa.instances.Instance;
-
 import moa.reduction.core.MOADiscretize;
 import weka.core.Range;
-import weka.core.Utils;
-import weka.filters.unsupervised.attribute.Discretize;
+
+import com.yahoo.labs.samoa.instances.Instance;
 /**
  * "To discretize a numeric attribute, fixed frequency discretization (FFD) sets a sufficient interval frequency, m. 
  * It then discretizes the ascendingly sorted values into intervals of frequency m. 
@@ -43,8 +40,7 @@ import weka.filters.unsupervised.attribute.Discretize;
  * 
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class IFFDdiscretize extends Discretize
-        implements MOADiscretize{
+public class IFFDdiscretize extends MOADiscretize {
     
     /**
 	 * 
@@ -136,72 +132,8 @@ public class IFFDdiscretize extends Discretize
      */
     public Instance applyDiscretization(Instance inst) {
     	if(m_CutPoints != null)
-    		return convertInstance2(inst);
+    		return convertInstance(inst);
     	return inst;
-    }   
-    
-    /**
-     * Convert a single instance over. The converted instance is added to the end
-     * of the output queue.
-     * 
-     * @param instance the instance to convert
-     */
-    protected Instance convertInstance2(Instance instance) {
-
-      int index = 0;
-      double[] vals = new double[instance.numAttributes()];
-      // Copy and convert the values
-      for (int i = 0; i < instance.numAttributes(); i++) {
-        if (m_DiscretizeCols.isInRange(i)
-          && instance.attribute(i).isNumeric()) {
-          int j;
-          double currentVal = instance.value(i);
-          if (m_CutPoints[i] == null) {
-            if (instance.isMissing(i)) {
-              vals[index] = Utils.missingValue();
-              instance.setValue(index, Utils.missingValue());
-            } else {
-              vals[index] = 0;
-              instance.setValue(index, 0);
-            }
-            index++;
-          } else {
-            if (!m_MakeBinary) {
-              if (instance.isMissing(i)) {
-                vals[index] = Utils.missingValue();
-                instance.setValue(index, Utils.missingValue());
-              } else {
-                for (j = 0; j < m_CutPoints[i].length; j++) {
-                  if (currentVal <= m_CutPoints[i][j]) {
-                    break;
-                  }
-                }
-                vals[index] = j;
-                instance.setValue(index, j);
-              }
-              index++;
-            } else {
-              for (j = 0; j < m_CutPoints[i].length; j++) {
-                if (instance.isMissing(i)) {
-                  vals[index] = Utils.missingValue();
-                  instance.setValue(index, Utils.missingValue());
-                } else if (currentVal <= m_CutPoints[i][j]) {
-                  vals[index] = 0;
-                  instance.setValue(index, 0);
-                } else {
-                  vals[index] = 1;
-                  instance.setValue(index, 1);
-                }
-                index++;
-              }
-            }
-          }
-        } else {
-          vals[index] = instance.value(i);
-          index++;
-        }
-      }      
-      return(instance);
     }
 
     /**
@@ -498,18 +430,4 @@ public class IFFDdiscretize extends Discretize
         //updateOutputFormat(index);
         
     }
-
-	@Override
-	public int getNumberIntervals() {
-		// TODO Auto-generated method stub
-		if(m_CutPoints != null) {
-			int ni = 0;
-			for(double[] cp: m_CutPoints){
-				if(cp != null)
-					ni += (cp.length + 1);
-			}
-			return ni;	
-		}
-		return 0;
-	}
 }

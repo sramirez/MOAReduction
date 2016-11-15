@@ -22,18 +22,15 @@
 package moa.reduction.bayes;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
 
-import com.yahoo.labs.samoa.instances.Instance;
-
 import moa.reduction.core.MOADiscretize;
 import weka.core.Range;
-import weka.core.Utils;
+
+import com.yahoo.labs.samoa.instances.Instance;
 
 /**
  * Online ChiMerge Algorith<br/>
@@ -45,11 +42,13 @@ import weka.core.Utils;
  * 
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class OCdiscretize implements MOADiscretize{
+public class OCdiscretize extends MOADiscretize{
 
 
-  /** Stores which columns to Discretize */
-  protected Range m_DiscretizeCols;
+  /**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 
   /** The number of bins to divide the attribute into */
   protected float totalCount;
@@ -71,6 +70,7 @@ public class OCdiscretize implements MOADiscretize{
 
   /** Constructor - initializes the filter */
   public OCdiscretize(int nc) {
+	  super();
 	  this.numClasses = nc;
 	  m_DiscretizeCols = new Range();	  
 	  totalCount = 0;
@@ -87,89 +87,34 @@ public class OCdiscretize implements MOADiscretize{
 	  this(numClasses);
 	  this.initialElements = initial;
   }
-  
-  /**
-   * Gets the current range selection
-   * 
-   * @return a string containing a comma separated list of ranges
-   */
-  public String getAttributeIndices() {
-
-    return m_DiscretizeCols.getRanges();
-  }
-
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param rangeList a string representing the list of attributes. Since the
-   *          string will typically come from a user, attributes are indexed
-   *          from 1. <br>
-   *          eg: first-3,5,6-last
-   * @throws IllegalArgumentException if an invalid range list is supplied
-   */
-  public void setAttributeIndices(String rangeList) {
-
-    m_DiscretizeCols.setRanges(rangeList);
-  }
-
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param attributes an array containing indexes of attributes to Discretize.
-   *          Since the array will typically come from a program, attributes are
-   *          indexed from 0.
-   * @throws IllegalArgumentException if an invalid set of ranges is supplied
-   */
-  public void setAttributeIndicesArray(int[] attributes) {
-
-    setAttributeIndices(Range.indicesToRangeList(attributes));
-  }
-
-  /**
-   * Gets the cut points for an attribute
-   * 
-   * @param attributeIndex the index (from 0) of the attribute to get the cut
-   *          points of
-   * @return an array containing the cutpoints (or null if the attribute
-   *         requested isn't being Discretized
-   */
-  public double[] getCutPoints(int attributeIndex) {
-
-    if (interval_l2 == null) {
-      return null;
-    }
-    
-    double[] cutpoints = new double[interval_l2.get(attributeIndex).size()];
-    for (int i = 0; i < cutpoints.length; i++) {
-		cutpoints[i] = interval_l2.get(attributeIndex).get(i).lower;
-	}
-    return cutpoints;
-  }
-  
 
   
   public Instance applyDiscretization(Instance inst) {
-	  if(trees != null)
+	  if(m_CutPoints != null)
 		  return convertInstance(inst);
 	  return inst;
   } 
   
   public void updateEvaluator(Instance instance) {
 	  
-	  if(trees == null) {
+	  if(m_CutPoints == null) {
 		  initialize(instance);
 	  }
 		  
 	  totalCount++;
-	  	
+	  
 	  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
 		  if ((m_DiscretizeCols.isInRange(i))
 			  && (instance.attribute(i).isNumeric())
 			  && (instance.classIndex() != i)) {
 			  	if (!instance.isMissing(i)) {		  
 			  		OnlineChiMerge(i, instance); 
+			  		// Transform intervals in list to a matrix
+			  		List<Interval> l = interval_l2.get(i);
+	  				m_CutPoints[i] = new double[l.size()];
+			  		for(int j = 0; j < l.size(); j++){
+		  				m_CutPoints[i][j] = l.get(j).lower;
+			  		}
 			  	}  
 		  }
 	  }
@@ -183,6 +128,7 @@ public class OCdiscretize implements MOADiscretize{
 	  interval_l = new ArrayList<List<Interval>>();
 	  interval_l2 = new ArrayList<List<Interval>>();
 	  example_q = new ArrayList<LinkedList<Pair>>();
+	  m_CutPoints = new double[inst.numAttributes()][];	
 	  it_bin = new ArrayList<LinkedList<Double>>();
 	  previous_bin = new ArrayList<Bin>();
 	  last_interval = new ArrayList<Interval>();
@@ -333,82 +279,6 @@ public class OCdiscretize implements MOADiscretize{
 
       return qval;
   }
-  
-  /**
-   * Convert a single instance over. The converted instance is added to the end
-   * of the output queue.
-   * 
-   * @param instance the instance to convert
-   */
-  protected Instance convertInstance(Instance instance) {
-
-    int index = 0;
-    double[] vals = new double[instance.numAttributes()];
-    // Copy and convert the values
-    for (int i = 0; i < instance.numAttributes(); i++) {
-      if (m_DiscretizeCols.isInRange(i)
-        && instance.attribute(i).isNumeric()) {
-        int j;
-        double currentVal = instance.value(i);
-        if (interval_l2.get(i) == null) {
-          if (instance.isMissing(i)) {
-            vals[index] = Utils.missingValue();
-            instance.setValue(index, Utils.missingValue());
-          } else {
-            vals[index] = 0;
-            instance.setValue(index, 0);
-          }
-          index++;
-        } else {
-          if (!m_MakeBinary) {
-            if (instance.isMissing(i)) {
-              vals[index] = Utils.missingValue();
-              instance.setValue(index, Utils.missingValue());
-            } else {
-              for (j = 0; j < interval_l2.get(i).size(); j++) {
-                if (currentVal <= interval_l2.get(i).get(j).lower) {
-                  break;
-                }
-              }
-              vals[index] = j;
-              instance.setValue(index, j);
-            }
-            index++;
-          } else {
-            for (j = 0; j < interval_l2.get(i).size(); j++) {
-              if (instance.isMissing(i)) {
-                vals[index] = Utils.missingValue();
-                instance.setValue(index, Utils.missingValue());
-              } else if (currentVal <= interval_l2.get(i).get(j).lower) {
-                vals[index] = 0;
-                instance.setValue(index, 0);
-              } else {
-                vals[index] = 1;
-                instance.setValue(index, 1);
-              }
-              index++;
-            }
-          }
-        }
-      } else {
-        vals[index] = instance.value(i);
-        index++;
-      }
-    }
-
-    /*Instance inst = null;
-    if (instance instanceof SparseInstance) {
-      inst = new SparseInstance(instance.weight(), vals);
-    } else {
-      inst = new DenseInstance(instance.weight(), vals);
-    }
-
-    copyValues(inst, false, instance.dataset(), outputFormatPeek());
-    */
-    //push(inst); // No need to copy instance
-    
-    return(instance);
-  }
 
   private class Bin {
 
@@ -491,19 +361,5 @@ public class OCdiscretize implements MOADiscretize{
 	    }
 
   }
-  
-	@Override
-	public int getNumberIntervals() {
-		// TODO Auto-generated method stub
-		if(interval_l2 != null) {
-			int ni = 0;
-			for(List<Interval> cp: interval_l2){
-				if(cp != null)
-					ni += cp.size();
-			}
-			return ni;	
-		}
-		return 0;
-	}
   
 }

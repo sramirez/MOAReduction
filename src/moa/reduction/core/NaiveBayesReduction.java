@@ -28,6 +28,7 @@ import moa.classifiers.AbstractClassifier;
 import moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
 import moa.classifiers.core.attributeclassobservers.NominalAttributeClassObserver;
+import moa.classifiers.core.attributeclassobservers.NumericAttributeClassObserver;
 import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
@@ -79,7 +80,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 3, 0, 3);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 1, 1, Integer.MAX_VALUE);  
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
@@ -143,8 +144,9 @@ public class NaiveBayesReduction extends AbstractClassifier {
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
             int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
             AttributeClassObserver obs = this.attributeObservers.get(i);
-            if (obs == null) {
-                obs = rinst.attribute(instAttIndex).isNominal() ? newNominalClassObserver()
+            com.yahoo.labs.samoa.instances.Attribute att = inst.attribute(instAttIndex);
+            if (obs == null || (att.isNominal() && obs instanceof NumericAttributeClassObserver)) {
+                obs = att.isNominal() ? newNominalClassObserver()
                         : newNumericClassObserver();
                 this.attributeObservers.set(i, obs);
             }

@@ -101,6 +101,8 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public void trainOnInstanceImpl(Instance inst) {
     	
     	Instance rinst = inst;
+    	
+    	// Update the FS evaluator (no selection is applied here)
     	if(fsmethodOption.getValue() != 0) {
     		if(fselector == null) {
     			if(fsmethodOption.getValue() == 3) {
@@ -122,6 +124,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
 			}
     	}
 	    	
+    	// Update the discretization scheme, and apply it to the given instance
     	if(discmethodOption.getValue() != 0) {
     		if(discretizer == null) {
     			if(discmethodOption.getValue() == 1) {
@@ -136,15 +139,12 @@ public class NaiveBayesReduction extends AbstractClassifier {
     		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
     	}
-    	if(rinst.classValue() == -1)
-    	{
-    		System.out.println("Error");
-    	}
+    	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
             int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
             AttributeClassObserver obs = this.attributeObservers.get(i);
-            com.yahoo.labs.samoa.instances.Attribute att = inst.attribute(instAttIndex);
+            com.yahoo.labs.samoa.instances.Attribute att = rinst.attribute(instAttIndex);
             if (obs == null || (att.isNominal() && obs instanceof NumericAttributeClassObserver)) {
                 obs = att.isNominal() ? newNominalClassObserver()
                         : newNumericClassObserver();

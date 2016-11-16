@@ -31,7 +31,6 @@ import com.yahoo.labs.samoa.instances.Instance;
 
 import moa.reduction.core.MOADiscretize;
 import weka.core.ContingencyTables;
-import weka.core.Range;
 
 /**
  <!-- globalinfo-start -->
@@ -52,7 +51,7 @@ public class PIDdiscretize extends MOADiscretize {
 	private static final long serialVersionUID = 1L;
 	
 	/** Parameters */	  
-	protected int l2UpdateExamples = 10000;
+	protected int l2UpdateExamples = 1000;
 	/** The number of bins to divide the attribute into */
 	protected float alpha = 0.75f;	
 
@@ -60,7 +59,7 @@ public class PIDdiscretize extends MOADiscretize {
 		
 	protected double max = 1;
 	
-	protected int initialBinsL1 = 500;
+	protected int initialBinsL1 = 200;
   
 	/** Instance limit before starting the splitting process */
 	protected int initialElements = 100;

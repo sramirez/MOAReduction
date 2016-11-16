@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import moa.reduction.core.MOADiscretize;
 import weka.core.Range;
@@ -64,6 +65,7 @@ public class OCdiscretize extends MOADiscretize{
   protected int[] phases;
   protected int initialElements = 100;
   protected int numClasses = 2;
+  private boolean created = false;
 
   /** Output binary attributes for discretized attributes. */
   protected boolean m_MakeBinary = false;
@@ -90,14 +92,14 @@ public class OCdiscretize extends MOADiscretize{
 
   
   public Instance applyDiscretization(Instance inst) {
-	  if(m_CutPoints != null)
+	  if(created)
 		  return convertInstance(inst);
 	  return inst;
   } 
   
   public void updateEvaluator(Instance instance) {
 	  
-	  if(m_CutPoints == null) {
+	  if(trees == null) {
 		  initialize(instance);
 	  }
 		  
@@ -109,12 +111,16 @@ public class OCdiscretize extends MOADiscretize{
 			  && (instance.classIndex() != i)) {
 			  	if (!instance.isMissing(i)) {		  
 			  		OnlineChiMerge(i, instance); 
-			  		// Transform intervals in list to a matrix
-			  		List<Interval> l = interval_l2.get(i);
-	  				m_CutPoints[i] = new double[l.size()];
-			  		for(int j = 0; j < l.size(); j++){
-		  				m_CutPoints[i][j] = l.get(j).lower;
-			  		}
+			  		if(!interval_l2.get(i).isEmpty())  {
+			  			created = true;
+			  			// Transform intervals in list to a matrix
+				  		List<Interval> l = interval_l2.get(i);
+				  		TreeSet<Double> ss = new TreeSet<Double>();
+				  		for(Interval inter: l) ss.add(inter.lower);
+		  				m_CutPoints[i] = new double[ss.size()];
+		  				int j = 0;
+				  		for(Double lower: ss) m_CutPoints[i][j++] = lower;
+			  		}			  		
 			  	}  
 		  }
 	  }
@@ -127,9 +133,9 @@ public class OCdiscretize extends MOADiscretize{
 	  interval_q = new ArrayList<PriorityQueue<Interval>>();
 	  interval_l = new ArrayList<List<Interval>>();
 	  interval_l2 = new ArrayList<List<Interval>>();
-	  example_q = new ArrayList<LinkedList<Pair>>();
-	  m_CutPoints = new double[inst.numAttributes()][];	
+	  example_q = new ArrayList<LinkedList<Pair>>();	  
 	  it_bin = new ArrayList<LinkedList<Double>>();
+	  m_CutPoints = new double[inst.numAttributes()][];	
 	  previous_bin = new ArrayList<Bin>();
 	  last_interval = new ArrayList<Interval>();
 	  

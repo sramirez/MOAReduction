@@ -46,7 +46,7 @@ import weka.core.Utils;
  * <br/>
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class IDAdiscretize implements MOADiscretize{
+public class IDAdiscretize extends MOADiscretize {
 
 	
 	protected int nBins = 100;
@@ -58,6 +58,8 @@ public class IDAdiscretize implements MOADiscretize{
 	protected long nElems = 0;
 	
 	protected IntervalHeap[][] bins;
+	
+	protected boolean windowMode = false;
 	
   /** Stores which columns to Discretize */  
   protected Range m_DiscretizeCols = new Range();
@@ -97,69 +99,22 @@ public class IDAdiscretize implements MOADiscretize{
 	  this.seed = seed;
 	  this.rand = new Random(seed);
   }
-  
-  /**
-   * Gets the current range selection
-   * 
-   * @return a string containing a comma separated list of ranges
-   */
-  public String getAttributeIndices() {
-    return m_DiscretizeCols.getRanges();
-  }
 
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param rangeList a string representing the list of attributes. Since the
-   *          string will typically come from a user, attributes are indexed
-   *          from 1. <br>
-   *          eg: first-3,5,6-last
-   * @throws IllegalArgumentException if an invalid range list is supplied
-   */
-  public void setAttributeIndices(String rangeList) {
-    m_DiscretizeCols.setRanges(rangeList);
-  }
-
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param attributes an array containing indexes of attributes to Discretize.
-   *          Since the array will typically come from a program, attributes are
-   *          indexed from 0.
-   * @throws IllegalArgumentException if an invalid set of ranges is supplied
-   */
-  public void setAttributeIndicesArray(int[] attributes) {
-    setAttributeIndices(Range.indicesToRangeList(attributes));
-  }
-
-  /**
-   * Gets the cut points for an attribute
-   * 
-   * @param attributeIndex the index (from 0) of the attribute to get the cut
-   *          points of
-   * @return an array containing the cutpoints (or null if the attribute
-   *         requested isn't being Discretized
-   */
-  public double[] getCutPoints(int attributeIndex) {
-
-    if (m_CutPointsL2 == null) {
-      return null;
-    }    
-    return m_CutPointsL2[attributeIndex];
-  }
   
   public Instance applyDiscretization(Instance inst) {
-	  if(m_CutPointsL2 != null)
+	  
+	  if(m_CutPoints != null){
+		  updateCP();
 		  return convertInstance(inst);
+	  }
+		  
 	  return inst;
   }
   
   
   public void updateEvaluator(Instance instance) {
 	  
-	  if(m_CutPointsL2 == null) {
+	  if(m_CutPoints == null) {
 		  initialize(instance);
 	  }
 	  

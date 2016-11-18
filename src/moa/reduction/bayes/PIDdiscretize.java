@@ -30,10 +30,7 @@ import java.util.Map;
 import com.yahoo.labs.samoa.instances.Instance;
 
 import moa.reduction.core.MOADiscretize;
-
 import weka.core.ContingencyTables;
-import weka.core.Range;
-import weka.core.Utils;
 
 /**
  <!-- globalinfo-start -->
@@ -46,10 +43,15 @@ import weka.core.Utils;
  * <br/>
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
-public class PIDdiscretize implements MOADiscretize{
+public class PIDdiscretize extends MOADiscretize {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	
 	/** Parameters */	  
-	protected int l2UpdateExamples = 10000;
+	protected int l2UpdateExamples = 1000;
 	/** The number of bins to divide the attribute into */
 	protected float alpha = 0.75f;	
 
@@ -60,10 +62,7 @@ public class PIDdiscretize implements MOADiscretize{
 	protected int initialBinsL1 = 200;
   
 	/** Instance limit before starting the splitting process */
-	protected int initialElements = 1000;
-	
-  /** Stores which columns to Discretize */  
-  protected Range m_DiscretizeCols = new Range();
+	protected int initialElements = 100;
 
   protected float totalCount = 0;
 
@@ -74,29 +73,15 @@ public class PIDdiscretize implements MOADiscretize{
   
   protected List<List<Map<Integer, Float>>> m_Distrib = null;
   
-  protected double[][] m_CutPointsL2 = null;
-  
   protected double step;
-
-  /** Output binary attributes for discretized attributes. */
-  protected boolean m_MakeBinary = false;
-
-  /** Use bin numbers rather than ranges for discretized attributes. */
-  protected boolean m_UseBinNumbers = false;
-
-  /** Use better encoding of split point for MDL. */
-  protected boolean m_UseBetterEncoding = false;
-
-  /** Precision for bin range labels */
-  protected int m_BinRangePrecision = 6;
-
-  /** Constructor - initialises the filter */
+  
+  /** Constructor - initializes the filter */
   public PIDdiscretize() {
 	  setAttributeIndices("first-last");
   }
   
   public PIDdiscretize(int initialElements, int initialBinsL1, int min, int max, int alpha, int l2UpdateExamples) {
-	  this();
+	  super();
 	  this.initialElements = initialElements;
 	  this.initialBinsL1 = initialBinsL1;
 	  this.min = min;
@@ -104,69 +89,16 @@ public class PIDdiscretize implements MOADiscretize{
 	  this.alpha = alpha;
 	  this.l2UpdateExamples = l2UpdateExamples;
   }
-  
-  /**
-   * Gets the current range selection
-   * 
-   * @return a string containing a comma separated list of ranges
-   */
-  public String getAttributeIndices() {
-    return m_DiscretizeCols.getRanges();
-  }
 
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param rangeList a string representing the list of attributes. Since the
-   *          string will typically come from a user, attributes are indexed
-   *          from 1. <br>
-   *          eg: first-3,5,6-last
-   * @throws IllegalArgumentException if an invalid range list is supplied
-   */
-  public void setAttributeIndices(String rangeList) {
-    m_DiscretizeCols.setRanges(rangeList);
-  }
-
-  /**
-   * Sets which attributes are to be Discretized (only numeric attributes among
-   * the selection will be Discretized).
-   * 
-   * @param attributes an array containing indexes of attributes to Discretize.
-   *          Since the array will typically come from a program, attributes are
-   *          indexed from 0.
-   * @throws IllegalArgumentException if an invalid set of ranges is supplied
-   */
-  public void setAttributeIndicesArray(int[] attributes) {
-    setAttributeIndices(Range.indicesToRangeList(attributes));
-  }
-
-  /**
-   * Gets the cut points for an attribute
-   * 
-   * @param attributeIndex the index (from 0) of the attribute to get the cut
-   *          points of
-   * @return an array containing the cutpoints (or null if the attribute
-   *         requested isn't being Discretized
-   */
-  public double[] getCutPoints(int attributeIndex) {
-
-    if (m_CutPointsL2 == null) {
-      return null;
-    }    
-    return m_CutPointsL2[attributeIndex];
-  }
-  
   public Instance applyDiscretization(Instance inst) {
-	  if(m_CutPointsL2 != null)
+	  if(m_CutPoints != null)
 		  return convertInstance(inst);
 	  return inst;
   }
   
   
-  public void updateEvaluator(Instance instance) {
-	  
-	  if(m_CutPointsL2 == null) {
+  public void updateEvaluator(Instance instance) {	  
+	  if(m_CutPoints == null) {
 		  initializeLayers(instance);
 	  }
 	  
@@ -183,14 +115,6 @@ public class PIDdiscretize implements MOADiscretize{
     
 	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
 		  updateLayer2(instance);
-		  //System.out.println("New layer 2\n\n");	  
-		  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-  	      if ((m_DiscretizeCols.isInRange(i))
-  	        && (instance.attribute(i).isNumeric())
-  	        && (instance.classIndex() != i)) {
-  	    	  //System.out.println(layertoString(m_CutPointsL2[i]));  	    	  	    	  
-  	      }
-  	    }
 	  }
   }
   
@@ -219,31 +143,30 @@ public class PIDdiscretize implements MOADiscretize{
   
   private void updateLayer2(Instance instance) {
 	// TODO Auto-generated method stub
-	m_CutPointsL2 = new double[m_CutPointsL1.size()][];
+	m_CutPoints = new double[m_CutPointsL1.size()][];
     for (int i = instance.numAttributes() - 1; i >= 0; i--) {
       if ((m_DiscretizeCols.isInRange(i))
         && (instance.attribute(i).isNumeric())) {
     	  double[] attCutPoints = cutPointsForSubset(i, 0, m_CutPointsL1.get(i).size());
     	  if(attCutPoints != null) {
-    		  m_CutPointsL2[i] = new double[attCutPoints.length];
-    		  System.arraycopy(attCutPoints, 0, m_CutPointsL2[i], 0, attCutPoints.length);  
+    		  m_CutPoints[i] = new double[attCutPoints.length];
+    		  System.arraycopy(attCutPoints, 0, m_CutPoints[i], 0, attCutPoints.length);  
     	  } else {
-    		  m_CutPointsL2[i] = new double[m_CutPointsL1.get(i).size()];
+    		  m_CutPoints[i] = new double[m_CutPointsL1.get(i).size()];
     		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
-    			  m_CutPointsL2[i][j] = m_CutPointsL1.get(i).get(j);
+    			  m_CutPoints[i][j] = m_CutPointsL1.get(i).get(j);
     		  }
     	  }    	  
       }
-    }
-	
+    }	
   }
   
   private void initL2FromL1() {
-	  m_CutPointsL2 = new double[m_CutPointsL1.size()][];
+	  m_CutPoints = new double[m_CutPointsL1.size()][];
 	  for (int i = 0; i < m_CutPointsL1.size(); i++) {
-		  m_CutPointsL2[i] = new double[m_CutPointsL1.get(i).size()];
+		  m_CutPoints[i] = new double[m_CutPointsL1.get(i).size()];
 		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
-			  m_CutPointsL2[i][j] = m_CutPointsL1.get(i).get(j);
+			  m_CutPoints[i][j] = m_CutPointsL1.get(i).get(j);
 		  } 
 	  }	  
   }
@@ -251,113 +174,50 @@ public class PIDdiscretize implements MOADiscretize{
   private void updateLayer1(Instance inst, int index) {
 	  int k = 0;
 	  if (!inst.isMissing(index)) {		  
-	        double x = inst.value(index);
-        	if(x <= m_CutPointsL1.get(index).get(0)){
-        		k = 0;
-        	} else if(x > m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1)) {
-        		k = m_CutPointsL1.get(index).size() - 1;
-        	} else {
-        		k = (int) Math.ceil((x - m_CutPointsL1.get(index).get(0)) / step);
-        		while(x <= m_CutPointsL1.get(index).get(k - 1)) k -= 1;
-    	        while(x > m_CutPointsL1.get(index).get(k)) k += 1;    	        
-        	}
-        	m_Counts.get(index).set(k, m_Counts.get(index).get(k) + 1);
-        	float nvalue = m_Distrib.get(index).get(k).getOrDefault((int) inst.classValue(), 0.f) + 1;
-        	m_Distrib.get(index).get(k).put((int) inst.classValue(), nvalue);
+        double x = inst.value(index);
+    	if(x <= m_CutPointsL1.get(index).get(0)){
+    		k = 0;
+    	} else if(x > m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1)) {
+    		k = m_CutPointsL1.get(index).size() - 1;
+    	} else {
+    		k = (int) Math.ceil((x - m_CutPointsL1.get(index).get(0)) / step);
+    		while(x <= m_CutPointsL1.get(index).get(k - 1)) k -= 1;
+	        while(x > m_CutPointsL1.get(index).get(k)) k += 1;    	        
+    	}
+    	m_Counts.get(index).set(k, m_Counts.get(index).get(k) + 1);
+    	float nvalue = m_Distrib.get(index).get(k).getOrDefault((int) inst.classValue(), 0.f) + 1;
+    	m_Distrib.get(index).get(k).put((int) inst.classValue(), nvalue);
+    	
+    	// Launch the split process
+        double prop = ((double) m_Counts.get(index).get(k)) / totalCount;
+        if(totalCount > initialElements && prop > alpha) {
+        	float tmp = m_Counts.get(index).get(k) / 2;
+        	m_Counts.get(index).set(k, tmp);
+        	Map<Integer, Float> classDist = m_Distrib.get(index).get(k); 
+        	Map<Integer, Float> halfDistrib = new HashMap<Integer, Float>();
+		    for (Map.Entry<Integer, Float> entry : classDist.entrySet()){
+	    	  halfDistrib.put(entry.getKey(), entry.getValue() / 2);
+		    }
+		    m_Distrib.get(index).set(k, halfDistrib);
         	
-        	// Launch the split process
-	        double prop = ((double) m_Counts.get(index).get(k)) / totalCount;
-	        if(totalCount > initialElements && prop > alpha) {
-	        	float tmp = m_Counts.get(index).get(k) / 2;
-	        	m_Counts.get(index).set(k, tmp);
-	        	Map<Integer, Float> classDist = m_Distrib.get(index).get(k); 
-	        	Map<Integer, Float> halfDistrib = new HashMap<Integer, Float>();
-			    for (Map.Entry<Integer, Float> entry : classDist.entrySet()){
-		    	  halfDistrib.put(entry.getKey(), entry.getValue() / 2);
-			    }
-			    m_Distrib.get(index).set(k, halfDistrib);
-	        	
-	        	if(k == 0) {
-	        		m_CutPointsL1.get(index).add(0, m_CutPointsL1.get(index).get(0) - step);
-	        		m_Counts.get(index).add(0, tmp);
-	        		m_Distrib.get(index).add(0, new HashMap<Integer,Float>(halfDistrib));
-	        	} else if(k >= m_CutPointsL1.get(index).size() - 1) {
-	        		m_CutPointsL1.get(index).add(m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1) + step);
-	        		m_Counts.get(index).add(tmp);
-	        		m_Distrib.get(index).add(new HashMap<Integer,Float>(halfDistrib));
-	        	} else {
-	        		double nBreak = (m_CutPointsL1.get(index).get(k) + m_CutPointsL1.get(index).get(k + 1)) / 2;
-	        		m_CutPointsL1.get(index).add(k + 1, nBreak); // Important to use add function
-	        		m_Counts.get(index).add(k + 1, tmp);
-	        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
-	        	}
-	        	initL2FromL1();
-	        }
-	        
+        	if(k == 0) {
+        		m_CutPointsL1.get(index).add(0, m_CutPointsL1.get(index).get(0) - step);
+        		m_Counts.get(index).add(0, tmp);
+        		m_Distrib.get(index).add(0, new HashMap<Integer,Float>(halfDistrib));
+        	} else if(k >= m_CutPointsL1.get(index).size() - 1) {
+        		m_CutPointsL1.get(index).add(m_CutPointsL1.get(index).get(m_CutPointsL1.get(index).size() - 1) + step);
+        		m_Counts.get(index).add(tmp);
+        		m_Distrib.get(index).add(new HashMap<Integer,Float>(halfDistrib));
+        	} else {
+        		double nBreak = (m_CutPointsL1.get(index).get(k) + m_CutPointsL1.get(index).get(k + 1)) / 2;
+        		m_CutPointsL1.get(index).add(k + 1, nBreak); // Important to use add function
+        		m_Counts.get(index).add(k + 1, tmp);
+        		m_Distrib.get(index).add(k, new HashMap<Integer,Float>(halfDistrib));
+        	}
+        }	        
       }
   }
 
-  /**
-   * Test using Fayyad and Irani's MDL criterion.
-   * 
-   * @param priorCounts
-   * @param bestCounts
-   * @param numInstances
-   * @param numCutPoints
-   * @return true if the splits is acceptable
-   */
-  private boolean FayyadAndIranisMDL(double[] priorCounts,
-    double[][] bestCounts, double numInstances, int numCutPoints) {
-
-    double priorEntropy, entropy, gain;
-    double entropyLeft, entropyRight, delta;
-    int numClassesTotal, numClassesRight, numClassesLeft;
-
-    // Compute entropy before split.
-    priorEntropy = ContingencyTables.entropy(priorCounts);
-
-    // Compute entropy after split.
-    entropy = ContingencyTables.entropyConditionedOnRows(bestCounts);
-
-    // Compute information gain.
-    gain = priorEntropy - entropy;
-
-    // Number of classes occuring in the set
-    numClassesTotal = 0;
-    for (double priorCount : priorCounts) {
-      if (priorCount > 0) {
-        numClassesTotal++;
-      }
-    }
-
-    // Number of classes occuring in the left subset
-    numClassesLeft = 0;
-    for (int i = 0; i < bestCounts[0].length; i++) {
-      if (bestCounts[0][i] > 0) {
-        numClassesLeft++;
-      }
-    }
-
-    // Number of classes occuring in the right subset
-    numClassesRight = 0;
-    for (int i = 0; i < bestCounts[1].length; i++) {
-      if (bestCounts[1][i] > 0) {
-        numClassesRight++;
-      }
-    }
-
-    // Entropy of the left and the right subsets
-    entropyLeft = ContingencyTables.entropy(bestCounts[0]);
-    entropyRight = ContingencyTables.entropy(bestCounts[1]);
-
-    // Compute terms for MDL formula
-    delta = Utils.log2(Math.pow(3, numClassesTotal) - 2)
-      - ((numClassesTotal * priorEntropy) - (numClassesRight * entropyRight) - (numClassesLeft * entropyLeft));
-
-    // Check if split is to be accepted
-    return (gain > (Utils.log2(numCutPoints) + delta) / numInstances);
-  }
-  
   private double[] cutPointsForSubset(int attIndex, int first, int lastPlusOne) {
 
 	    //Map<Integer, Double> counts, bestCounts;
@@ -401,26 +261,6 @@ public class PIDdiscretize implements MOADiscretize{
 	    // Entropy of the full set
 	    priorEntropy = ContingencyTables.entropy(priorCounts);
 	    bestEntropy = priorEntropy;
-	    
-	    // Compute class counts.
-	    /*counts = new HashMap<Integer, Double>();
-	    for (int i = first; i < lastPlusOne; i++) {
-	      
-	      Map<Integer, Integer> classDist = m_Distrib.get(attIndex).get(i); 
-	      for (Map.Entry<Integer, Integer> entry : classDist.entrySet()){
-	    	  double c = counts.getOrDefault(entry.getKey(), 0.0) + entry.getValue();
-	          counts.put(entry.getKey(), c);
-	          numInstances += c;
-	      }
-	    }*/
-
-	    // Entropy of the full set
-	    
-	    /*Double[] priorCounts = counts.values().toArray(new Double[counts.size()]);
-	    double[] prior = new double[counts.size()];
-	    for (int i = 0; i < counts.size(); i++) {
-	    	prior[i] = priorCounts[i];
-	    }*/
 	    
 	    priorEntropy = ContingencyTables.entropy(priorCounts);
 	    bestEntropy = priorEntropy;
@@ -466,7 +306,7 @@ public class PIDdiscretize implements MOADiscretize{
 	      right = cutPointsForSubset(attIndex, bestIndex + 1,
 	        lastPlusOne);
 
-	      // Merge cutpoints and return them
+	      // Merge cut points and return them
 	      if ((left == null) && (right) == null) {
 	        cutPoints = new double[1];
 	        cutPoints[0] = bestCutPoint;
@@ -490,85 +330,4 @@ public class PIDdiscretize implements MOADiscretize{
 	      return null;
 	    }
   	}
-  
-  /**
-   * Convert a single instance over. The converted instance is added to the end
-   * of the output queue.
-   * 
-   * @param instance the instance to convert
-   */
-  protected Instance convertInstance(Instance instance) {
-
-    int index = 0;
-    double[] vals = new double[instance.numAttributes()];
-    // Copy and convert the values
-    for (int i = 0; i < instance.numAttributes(); i++) {
-      if (m_DiscretizeCols.isInRange(i)
-        && instance.attribute(i).isNumeric()) {
-        int j;
-        double currentVal = instance.value(i);
-        if (m_CutPointsL2[i] == null) {
-          if (instance.isMissing(i)) {
-            vals[index] = Utils.missingValue();
-            instance.setValue(index, Utils.missingValue());
-          } else {
-            vals[index] = 0;
-            instance.setValue(index, 0);
-          }
-          index++;
-        } else {
-          if (!m_MakeBinary) {
-            if (instance.isMissing(i)) {
-              vals[index] = Utils.missingValue();
-              instance.setValue(index, Utils.missingValue());
-            } else {
-              for (j = 0; j < m_CutPointsL2[i].length; j++) {
-                if (currentVal <= m_CutPointsL2[i][j]) {
-                  break;
-                }
-              }
-              vals[index] = j;
-              instance.setValue(index, j);
-            }
-            index++;
-          } else {
-            for (j = 0; j < m_CutPointsL2[i].length; j++) {
-              if (instance.isMissing(i)) {
-                vals[index] = Utils.missingValue();
-                instance.setValue(index, Utils.missingValue());
-              } else if (currentVal <= m_CutPointsL2[i][j]) {
-                vals[index] = 0;
-                instance.setValue(index, 0);
-              } else {
-                vals[index] = 1;
-                instance.setValue(index, 1);
-              }
-              index++;
-            }
-          }
-        }
-      } else {
-        vals[index] = instance.value(i);
-        index++;
-      }
-    }
-    
-    return(instance);
-  }
-  
-	@Override
-	public int getNumberIntervals() {
-		// TODO Auto-generated method stub
-		if(m_CutPointsL2 != null) {
-			int ni = 0;
-			for(double[] cp: m_CutPointsL2){
-				if(cp != null)
-					ni += (cp.length + 1);
-			}
-			return ni;	
-		}
-		return 0;
-	}
-
-
 }

@@ -12,7 +12,6 @@ import moa.classifiers.competence.ICFFullCB;
 import moa.classifiers.competence.NEFCSSRR;
 import moa.classifiers.lazy.kNN;
 import moa.classifiers.meta.FISH;
-import moa.classifiers.meta.LearnNSE;
 import moa.core.InstanceExample;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesReduction;
@@ -31,7 +30,7 @@ public class ExperimentTest {
         		Classifier learner = new NaiveBayesReduction();
                 
                 //RandomRBFGenerator stream = new RandomRBFGenerator();
-                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/airlines.arff", -1);
+                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/blips.arff", -1);
         		//stream.numAttsOption.setValue(1000);
                 stream.prepareForUse();
 
@@ -58,6 +57,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(10000, true);
+                exp.run(1000000, true);
         }
 }

@@ -368,6 +368,8 @@ public abstract class MOADiscretize extends Filter {
 	          }
 	        }
 	        
+	        System.out.println("Att: " + i);
+	        System.out.println("Att values: " + attribValues);
 	        Attribute newAtt = new Attribute(
 	          inputFormat.attribute(i).name(), attribValues);
 	        newAtt.setWeight(inputFormat.attribute(i).weight());

@@ -21,96 +21,82 @@
 
 package moa.reduction.bayes;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
+import java.util.TreeSet;
+
+import moa.reduction.core.MOADiscretize;
+import weka.core.Range;
 
 import com.yahoo.labs.samoa.instances.Instance;
 
-import moa.reduction.core.MOADiscretize;
-import weka.core.ContingencyTables;
-import weka.core.Range;
-import weka.core.Utils;
-
 /**
  <!-- globalinfo-start -->
- * Partition Incremental Discretization (PiD)
+ * Incremental Discretization Algorithm (IDA)
  * <br/>
  * For more information, see:<br/>
  * <br/>
- * João Gama and Carlos Pinto. 2006. Discretization from data streams: applications to histograms and data mining. 
- * In Proceedings of the 2006 ACM symposium on Applied computing (SAC '06). ACM, New York, NY, USA, 662-667. DOI=http://dx.doi.org/10.1145/1141277.1141429
+ * Geoffrey I. Webb. 2014. Contrary to Popular Belief Incremental Discretization can be Sound, 
+ * Computationally Efficient and Extremely Useful for Streaming Data. 
+ * In Proceedings of the 2014 IEEE International Conference on Data Mining (ICDM '14). 
+ * DOI=http://dx.doi.org/10.1109/ICDM.2014.123 
  * <br/>
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
 public class IDAdiscretize extends MOADiscretize {
 
 	
-	protected int nBins = 100;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	
 	protected long seed = 517231741;
-	
-	protected int sampleSize = 0;
 
 	protected long nElems = 0;
 	
 	protected IntervalHeap[][] bins;
 	
-	protected boolean windowMode = false;
+	private int nBins;
 	
-  /** Stores which columns to Discretize */  
-  protected Range m_DiscretizeCols = new Range();
-
-  /** Store the current cutpoints */  
-  protected List<List<Double>> m_CutPointsL1 = null;
-  
-  protected List<List<Float>> m_Counts = null;
-  
-  protected List<List<Map<Integer, Float>>> m_Distrib = null;
-  
-  protected double[][] m_CutPointsL2 = null;
-  
-  protected double step;
-
-  /** Output binary attributes for discretized attributes. */
-  protected boolean m_MakeBinary = false;
-
-  /** Use bin numbers rather than ranges for discretized attributes. */
-  protected boolean m_UseBinNumbers = false;
-
-  /** Use better encoding of split point for MDL. */
-  protected boolean m_UseBetterEncoding = false;
-
-  /** Precision for bin range labels */
-  protected int m_BinRangePrecision = 6;
+	private TreeSet<Double>[] originalCP;
   
   protected Random rand;
 
+  private int sampleSize;
+  
+  private boolean initialized = false;
+  
+  private int contInit = 0;
+
   /** Constructor - initialises the filter */
   public IDAdiscretize() {
+	  super();
 	  setAttributeIndices("first-last");
+	  this.rand = new Random();
+	  this.sampleSize = 1000;
+	  this.nBins = 100;
   }
   
-  public IDAdiscretize(long seed, int initialElements, int initialBinsL1, int min, int max, int alpha, int l2UpdateExamples) {
+  public IDAdiscretize(long seed, int nBins, int sampleSize, boolean windowMode) {
 	  this();
 	  this.seed = seed;
+	  this.nBins = nBins;
 	  this.rand = new Random(seed);
+	  this.sampleSize = sampleSize;
   }
-
   
   public Instance applyDiscretization(Instance inst) {
 	  
-	  if(m_CutPoints != null){
-		  updateCP();
+	  if(initialized){
+		  shiftLimits();
 		  return convertInstance(inst);
-	  }
-		  
+	  }		  
 	  return inst;
-  }
-  
+  }  
   
   public void updateEvaluator(Instance instance) {
 	  
@@ -120,129 +106,147 @@ public class IDAdiscretize extends MOADiscretize {
 	  
 	  nElems++;
 	  
-	  if(rand.nextFloat() < sampleSize / nElems) {
-		  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-			  if ((m_DiscretizeCols.isInRange(i))
-					  && (instance.attribute(i).isNumeric())
-					  && (instance.classIndex() != i)) {
-				  
-				  if(bins[i].length == sampleSize)
-					  removeRandomValue(i);
-				  insertValue(instance.value(i), i);				  
+	  boolean insertion = rand.nextFloat() < ((float) sampleSize / nElems);
+	  for (int i = instance.numAttributes() - 1; i >= 0; i--) {
+		  if ((m_DiscretizeCols.isInRange(i))
+				  && (instance.attribute(i).isNumeric())
+				  && (instance.classIndex() != i)) {			  
+			  
+			  if(!isPreparedToInitialize(instance)){
+				  originalCP[i].add(instance.value(i));				  
+			  } else if (initialized) {
+				  if(insertion)
+					  update(instance.value(i), i, nElems > sampleSize); // replacement
+			  } else {
+				  initializeBins();
+			  }				  
+		  }
+	  } 	  
+  }
+  
+  private boolean isPreparedToInitialize(Instance instance){
+	  for (int j = 0; j < originalCP.length; j++) {
+		  if ((m_DiscretizeCols.isInRange(j))
+				  && (instance.attribute(j).isNumeric())
+				  && (instance.classIndex() != j)) {
+			  if(originalCP[j].size() < nBins)
+				  return false;
+		  }
+	  }
+	  return true;
+  }
+  
+  private void initializeBins(){
+	  for (int i = 0; i < bins.length; i++) {
+	    Double[] result = originalCP[i].toArray(new Double[originalCP[i].size()]);
+		for (int j = 0; j < bins[i].length && result.length > 0; j++) {
+			bins[i][j].add(result[j]);
+		}
+	  }
+	  initialized = true;
+  }
+  
+  // Update the limits according to the last movements
+  private void shiftLimits(){
+	  if(initialized)  {
+		  // Transform intervals in list to a matrix
+		  for (int i = 0; i < bins.length; i++) {
+			  LinkedHashSet<Double> uniquePoints = new LinkedHashSet<Double>();
+			  for (int j = 0; j < bins[i].length && bins[i][j].spareSpace > 0; j++){				  
+				 uniquePoints.add((double) bins[i][j].inspectMost());
+			  }	
+			  
+			  m_CutPoints[i] = new double[uniquePoints.size()];
+			  int j = 0;
+			  for (Iterator<Double> iterator = uniquePoints.iterator(); iterator
+					.hasNext();) {
+				m_CutPoints[i][j] = (double) iterator.next();
+				j++;
 			  }
-		  } 
-	  }
+			  
+		  } 			  
+	  }	
   }
   
-  
-  private void insertValue(double v, int index){
-	  IntervalHeap[] intervals = bins[index];
-	  int t = intervals.length % nBins;
-	  int j = 0;
-	  while(j < intervals.length && (double) intervals[j].getMost() < v)
-		  j++;
-	  intervals[j].add(v);
+  private void update(double v, int index, boolean replacement) {
+	  
+	  // Look for the appropiate bin using binary search
+	  double[] cutpoints = new double[bins[index].length];
+	  for (int i = 0; i < bins[index].length; i++) {
+		  cutpoints[i] = (double) bins[index][i].inspectMost();
+	  }
+	  int j = java.util.Arrays.binarySearch(cutpoints, v);
+	  if(j < 0 || j == cutpoints.length){
+		  j = Math.abs(j) - 1;
+	  }
+	  
+	  // Randomly delete an element from the pool of interval heaps
+	  if(replacement){
+		  int rind = rand.nextInt(bins.length);
+		  IntervalHeap interval = bins[index][rind];
+		  int eind = rand.nextInt(interval.spareSpace);
+		  interval.removeElement(eind);
+	  }
+	  
+	  // Insert the element into the appropiate bin
+	  bins[index][j].add(v);
+	  
+	  int t = findTargetBin(j, index);
+	  
 	  if(j < t){
-		  for(int k = j; j < t; k++)
-			  intervals[k + 1].add(intervals[k].getMost());
+		  for(int k = j; k < t; k++)
+			  bins[index][k + 1].add(bins[index][k].getMost());
 	  } else {
-		  for(int k = t; t < j; k++)
-			  intervals[k].add(intervals[k + 1].getLeast());
+		  for(int k = t; k < j; k++)
+			  bins[index][k].add(bins[index][k + 1].getLeast());
 	  }
   }
   
-  private void removeRandomValue(int index) {
-	  int rind = rand.nextInt(bins.length);
-	  IntervalHeap interval = bins[index][rind];
-	  rind = rand.nextInt(interval.size);
-	  interval.removeElement(rind);
+  private int findTargetBin(int pivot, int index){
+	  // Search to find the next bin that should increase in size
+	  int minri = -1; 
+	  double minrs = Integer.MAX_VALUE; 		  
+	  for (int i = pivot + 1; i < bins[index].length; i++) {
+		  int size = bins[index][i].spareSpace;
+		  if(size < minrs){
+			  minri = i;
+			  minrs = size;
+		  }		
+	  }
+	  
+	  int minli = -1; 
+	  double minls = Integer.MAX_VALUE; 		  
+	  for (int i = pivot - 1; i >= 0; i--) {
+		  int size = bins[index][i].spareSpace;
+		  if(size < minls){
+			  minli = i;
+			  minls = size;
+		  }	
+	  }
+	  
+	  if(minri + minli == -2){
+		  return pivot;
+	  } else if (minrs < minls) {
+		  return minri;
+	  } else if(minrs > minls) {
+		  return minli;
+	  } else {
+		  return Math.abs(minri - pivot) < Math.abs(minli - pivot) ? minri : minli ;
+	  }
   }
-  
   
   private void initialize(Instance inst){
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);	  
-	  bins = new IntervalHeap[inst.numAttributes()][sampleSize];
-	  m_Counts = new ArrayList<List<Float>>(inst.numAttributes());
+	  bins = new IntervalHeap[inst.numAttributes()][nBins];	  
+	  m_CutPoints = new double[inst.numAttributes()][nBins];
+	  originalCP = new TreeSet[inst.numAttributes()];
+	  for (int i = 0; i < inst.numAttributes(); i++){
+		  originalCP[i] = new TreeSet<Double>();
+		  for (int j = 0; j < bins[i].length; j++) {
+			  bins[i][j] = new IntervalHeap();
+		}		  
+	  }		
   }
   
-  /**
-   * Convert a single instance over. The converted instance is added to the end
-   * of the output queue.
-   * 
-   * @param instance the instance to convert
-   */
-  protected Instance convertInstance(Instance instance) {
-
-    int index = 0;
-    double[] vals = new double[instance.numAttributes()];
-    // Copy and convert the values
-    for (int i = 0; i < instance.numAttributes(); i++) {
-      if (m_DiscretizeCols.isInRange(i)
-        && instance.attribute(i).isNumeric()) {
-        int j;
-        double currentVal = instance.value(i);
-        if (m_CutPointsL2[i] == null) {
-          if (instance.isMissing(i)) {
-            vals[index] = Utils.missingValue();
-            instance.setValue(index, Utils.missingValue());
-          } else {
-            vals[index] = 0;
-            instance.setValue(index, 0);
-          }
-          index++;
-        } else {
-          if (!m_MakeBinary) {
-            if (instance.isMissing(i)) {
-              vals[index] = Utils.missingValue();
-              instance.setValue(index, Utils.missingValue());
-            } else {
-              for (j = 0; j < m_CutPointsL2[i].length; j++) {
-                if (currentVal <= m_CutPointsL2[i][j]) {
-                  break;
-                }
-              }
-              vals[index] = j;
-              instance.setValue(index, j);
-            }
-            index++;
-          } else {
-            for (j = 0; j < m_CutPointsL2[i].length; j++) {
-              if (instance.isMissing(i)) {
-                vals[index] = Utils.missingValue();
-                instance.setValue(index, Utils.missingValue());
-              } else if (currentVal <= m_CutPointsL2[i][j]) {
-                vals[index] = 0;
-                instance.setValue(index, 0);
-              } else {
-                vals[index] = 1;
-                instance.setValue(index, 1);
-              }
-              index++;
-            }
-          }
-        }
-      } else {
-        vals[index] = instance.value(i);
-        index++;
-      }
-    }
-    
-    return(instance);
-  }
-  
-	@Override
-	public int getNumberIntervals() {
-		// TODO Auto-generated method stub
-		if(m_CutPointsL2 != null) {
-			int ni = 0;
-			for(double[] cp: m_CutPointsL2){
-				if(cp != null)
-					ni += (cp.length + 1);
-			}
-			return ni;	
-		}
-		return 0;
-	}
-
 
 }

@@ -33,6 +33,7 @@ import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
+import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
 import moa.reduction.bayes.OCdiscretize;
@@ -80,7 +81,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge", 1, 0, 3);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA", 4, 0, 4);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 1, 1, Integer.MAX_VALUE);  
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
@@ -133,6 +134,8 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    		discretizer = new IFFDdiscretize();	
     	    	} else if(discmethodOption.getValue() == 3) {
     	    		discretizer = new OCdiscretize(this.numClassesOption.getValue());
+    	    	} else {
+    	    		discretizer = new IDAdiscretize();
     	    	}
     		}
     		discretizer.updateEvaluator(inst);

@@ -201,7 +201,7 @@ public class IntervalHeap {
 	
 	public Comparable inspectMost() {
 		Comparable most = DEPQH[1][0];
-		System.out.println("Inspect most is " + DEPQH[1][0]);
+		//System.out.println("Inspect most is " + DEPQH[1][0]);
 
 		/*
 		 * If only 1 element in whole DEPQ (can tell if most is null), then the

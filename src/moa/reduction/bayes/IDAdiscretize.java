@@ -58,7 +58,7 @@ public class IDAdiscretize extends MOADiscretize {
 
 	protected long nElems = 0;
 	
-	protected IntervalHeap[][] bins;
+	protected IntervalHeap2[][] bins;
 	
 	private int nBins;
 	
@@ -152,7 +152,7 @@ public class IDAdiscretize extends MOADiscretize {
 		  // Transform intervals in list to a matrix
 		  for (int i = 0; i < bins.length; i++) {
 			  LinkedHashSet<Double> uniquePoints = new LinkedHashSet<Double>();
-			  for (int j = 0; j < bins[i].length && bins[i][j].spareSpace > 0; j++){				  
+			  for (int j = 0; j < bins[i].length && bins[i][j].size() > 0; j++){				  
 				 uniquePoints.add((double) bins[i][j].inspectMost());
 			  }	
 			  
@@ -181,17 +181,27 @@ public class IDAdiscretize extends MOADiscretize {
 	  }
 	  
 	  // Randomly delete an element from the pool of interval heaps
-	  if(replacement){
+	  /*if(replacement){
 		  int rind = rand.nextInt(bins.length);
-		  IntervalHeap interval = bins[index][rind];
-		  int eind = rand.nextInt(interval.spareSpace);
+		  IntervalHeap2 interval = bins[index][rind];
+		  int eind = rand.nextInt(interval.size);
 		  interval.removeElement(eind);
-	  }
+	  }*/
 	  
-	  // Insert the element into the appropiate bin
 	  bins[index][j].add(v);
 	  
 	  int t = findTargetBin(j, index);
+	  
+
+	  // Insert the element into the appropiate bin
+	  System.out.println("Index: " + index);
+	  String str = "";
+	  for (int i = 0; i < bins[index].length; i++) {
+		str += bins[index][i].size() + "|";
+		
+	  }
+	  System.out.println(str);
+	  
 	  
 	  if(j < t){
 		  for(int k = j; k < t; k++)
@@ -207,7 +217,7 @@ public class IDAdiscretize extends MOADiscretize {
 	  int minri = -1; 
 	  double minrs = Integer.MAX_VALUE; 		  
 	  for (int i = pivot + 1; i < bins[index].length; i++) {
-		  int size = bins[index][i].spareSpace;
+		  int size = bins[index][i].size();
 		  if(size < minrs){
 			  minri = i;
 			  minrs = size;
@@ -217,7 +227,7 @@ public class IDAdiscretize extends MOADiscretize {
 	  int minli = -1; 
 	  double minls = Integer.MAX_VALUE; 		  
 	  for (int i = pivot - 1; i >= 0; i--) {
-		  int size = bins[index][i].spareSpace;
+		  int size = bins[index][i].size();
 		  if(size < minls){
 			  minli = i;
 			  minls = size;
@@ -237,13 +247,13 @@ public class IDAdiscretize extends MOADiscretize {
   
   private void initialize(Instance inst){
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);	  
-	  bins = new IntervalHeap[inst.numAttributes()][nBins];	  
+	  bins = new IntervalHeap2[inst.numAttributes()][nBins];	  
 	  m_CutPoints = new double[inst.numAttributes()][nBins];
 	  originalCP = new TreeSet[inst.numAttributes()];
 	  for (int i = 0; i < inst.numAttributes(); i++){
 		  originalCP[i] = new TreeSet<Double>();
 		  for (int j = 0; j < bins[i].length; j++) {
-			  bins[i][j] = new IntervalHeap();
+			  bins[i][j] = new IntervalHeap2();
 		}		  
 	  }		
   }

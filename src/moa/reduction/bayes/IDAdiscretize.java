@@ -58,7 +58,7 @@ public class IDAdiscretize extends MOADiscretize {
 
 	protected long nElems = 0;
 	
-	protected IntervalHeap2[][] bins;
+	protected IntervalHeap[][] bins;
 	
 	private int nBins;
 	
@@ -194,13 +194,13 @@ public class IDAdiscretize extends MOADiscretize {
 	  
 
 	  // Insert the element into the appropiate bin
-	  System.out.println("Index: " + index);
+	  /*System.out.println("Index: " + index);
 	  String str = "";
 	  for (int i = 0; i < bins[index].length; i++) {
 		str += bins[index][i].size() + "|";
 		
 	  }
-	  System.out.println(str);
+	  System.out.println(str);*/
 	  
 	  
 	  if(j < t){
@@ -210,25 +210,33 @@ public class IDAdiscretize extends MOADiscretize {
 		  for(int k = t; k < j; k++)
 			  bins[index][k].add(bins[index][k + 1].getLeast());
 	  }
+	  
+	  /*System.out.println("Index: " + index);
+	  String str2 = "";
+	  for (int i = 0; i < bins[index].length; i++) {
+		str2 += bins[index][i].size() + "|";
+		
+	  }
+	  System.out.println(str2);*/
   }
   
   private int findTargetBin(int pivot, int index){
 	  // Search to find the next bin that should increase in size
 	  int minri = -1; 
-	  double minrs = Integer.MAX_VALUE; 		  
+	  int minrs = bins[index][pivot].size(); 		  
 	  for (int i = pivot + 1; i < bins[index].length; i++) {
 		  int size = bins[index][i].size();
-		  if(size < minrs){
+		  if(size < minrs - 1){
 			  minri = i;
 			  minrs = size;
 		  }		
 	  }
 	  
 	  int minli = -1; 
-	  double minls = Integer.MAX_VALUE; 		  
+	  int minls = bins[index][pivot].size(); 		  
 	  for (int i = pivot - 1; i >= 0; i--) {
 		  int size = bins[index][i].size();
-		  if(size < minls){
+		  if(size < minls - 1){
 			  minli = i;
 			  minls = size;
 		  }	
@@ -247,13 +255,13 @@ public class IDAdiscretize extends MOADiscretize {
   
   private void initialize(Instance inst){
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);	  
-	  bins = new IntervalHeap2[inst.numAttributes()][nBins];	  
+	  bins = new IntervalHeap[inst.numAttributes()][nBins];	  
 	  m_CutPoints = new double[inst.numAttributes()][nBins];
 	  originalCP = new TreeSet[inst.numAttributes()];
 	  for (int i = 0; i < inst.numAttributes(); i++){
 		  originalCP[i] = new TreeSet<Double>();
 		  for (int j = 0; j < bins[i].length; j++) {
-			  bins[i][j] = new IntervalHeap2();
+			  bins[i][j] = new IntervalHeap();
 		}		  
 	  }		
   }

@@ -56,7 +56,7 @@ public class IDAdiscretize extends MOADiscretize {
 	  public IDAdiscretize() {
 		  super();
 		  setAttributeIndices("first-last");
-		  this.type = IDAType.IDA;
+		  this.type = IDAType.IDAW;
 		  this.sampleSize = 1000;
 		  this.nBins = 5;
 	  }	

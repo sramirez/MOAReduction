@@ -575,6 +575,10 @@ public abstract class MOADiscretize extends Filter {
 		return 0;
 	}
 
+	/**
+	 * Update the discretization model without updating 
+	 * @param inst
+	 */
 	public abstract void updateEvaluator(Instance inst);
 	public abstract Instance applyDiscretization(Instance inst);
 

@@ -1,6 +1,6 @@
 /* 
 ** Class for a discretisation filter for instance streams
-** Copyright (C) 2016 Germain Forestier, Geoffrey I Webb
+** Copyright (C) 2016 Germain Forestier, Geoffrey I Webb, Sergio Ramírez
 **
 ** This program is free software: you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -77,16 +77,21 @@ public class SamplingReservoir {
 		
 		LinkedHashSet<Double> uniquePoints = new LinkedHashSet<Double>();
 		for (int i = 0; i < values.length; i++) {
-			if(!values[i].isEmpty()) 
+			if(!values[i].isEmpty()) {
+				System.out.print(values[i].peekLast() + ",");
 				uniquePoints.add(values[i].peekLast());
-			
+				
+			}
+			System.out.println();
 		}
-		
+		/* Return only unique points, in order to accomplish conditions 
+		 * marked by the discretizer template */
 		int j = 0;
 		double[] bounds = new double[uniquePoints.size()];
 		for (Iterator<Double> iterator = uniquePoints.iterator(); iterator
 				.hasNext();) {
 			bounds[j] = (double) iterator.next();
+			
 			j++;
 		}
 		return bounds;

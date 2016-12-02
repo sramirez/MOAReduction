@@ -6,15 +6,15 @@ MOAReduction is an extension for MOA, which allows to perform data reduction on 
 
 ## Installation and requirements
 
-In order to use the library and its reduction algorithms, please download MOAReduction.jar, jCOLIBRI2.jar (both modified) and weka.jar from the lib directory in this repository. Notice that only weka.jar can be downloaded from the official repository (the version used of weka is detailed in the NOTICE file). Then add all these libraries to the classpath when lauching MOA.
+In order to use the library and its reduction algorithms, please download MOAReduction.jar, jCOLIBRI2.jar (both modified), guava.jar and weka.jar from the lib directory in this repository. Notice that only weka.jar and guava (v20.0) can be downloaded from the official repository (the version used of weka is detailed in the NOTICE file). Then add all these libraries to the classpath when lauching MOA.
 
 Example (Windows):
 
-> java -cp .;lib/MOAReduction.jar;moa.jar;lib/weka.jar;lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
+> java -cp .;lib/MOAReduction.jar;moa.jar;lib/guava-20.0.jar;lib/weka.jar;lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
 
 Example (Linux/mac):
 
-> java -cp lib/MOAReduction.jar:moa.jar:lib/weka.jar:lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
+> java -cp lib/MOAReduction.jar:moa.jar:lib/guava-20.0.jar:lib/weka.jar:lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
 
 You can also unzip MOA's any of the JAR files, add the source code for the algorithms desired to MOA and recompile it.
 

@@ -80,7 +80,7 @@ Params:
 * -w winSize: batch size (default = 1)
 * -f numFeatures: number of features to select (default = 10)
 * -m fsMethod: feature selection method to apply. Options: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFS (default = 0)
-* -d discMethod: feature selection method to apply. Options: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge (default = 0)
+* -d discMethod: feature selection method to apply. Options: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA (default = 0)
 * -c numClasses: maximum number of classes involved in the problem (default = 100)
 
 The above parameters are common to the following discretization and feature selection methods: 

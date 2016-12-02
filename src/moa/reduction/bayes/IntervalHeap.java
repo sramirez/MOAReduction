@@ -26,7 +26,7 @@ import java.util.LinkedList;
 
 import com.google.common.collect.MinMaxPriorityQueue;
 
-public class SamplingReservoir {
+public class IntervalHeap {
 
 	// index of this attribute
 	protected int attIndex;
@@ -41,7 +41,7 @@ public class SamplingReservoir {
 	// the value of the current window (might not be used if random sample)
 	protected LinkedList<Double> windowValues = new LinkedList<Double>();
 
-	public SamplingReservoir(int nBins, int sampleSize, int attIndex) {
+	public IntervalHeap(int nBins, int sampleSize, int attIndex) {
 		this.nBins = nBins;
 		this.sampleSize = sampleSize;
 		values = new MinMaxPriorityQueue[nBins];
@@ -78,11 +78,8 @@ public class SamplingReservoir {
 		LinkedHashSet<Double> uniquePoints = new LinkedHashSet<Double>();
 		for (int i = 0; i < values.length; i++) {
 			if(!values[i].isEmpty()) {
-				System.out.print(values[i].peekLast() + ",");
-				uniquePoints.add(values[i].peekLast());
-				
+				uniquePoints.add(values[i].peekLast());				
 			}
-			System.out.println();
 		}
 		/* Return only unique points, in order to accomplish conditions 
 		 * marked by the discretizer template */

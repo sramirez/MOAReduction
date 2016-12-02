@@ -41,7 +41,7 @@ public class IDAdiscretize extends MOADiscretize {
 	// number of attributes
 	protected int nbNumericalAttributes;
 	// sample reservoir, one for each numerical attribute
-	protected SamplingReservoir[] sReservoirs;
+	protected IntervalHeap[] sReservoirs;
 	
 	// type of IDA
 	protected IDAType type;
@@ -166,9 +166,9 @@ public class IDAdiscretize extends MOADiscretize {
 			if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) 
 				nbNumericalAttributes++;
 		}
-		this.sReservoirs =  new SamplingReservoir[nbNumericalAttributes];
+		this.sReservoirs =  new IntervalHeap[nbNumericalAttributes];
 		for (int i = 0; i < nbNumericalAttributes; i++) {
-			sReservoirs[i] = new SamplingReservoir(this.nBins, this.sampleSize, i);
+			sReservoirs[i] = new IntervalHeap(this.nBins, this.sampleSize, i);
 		}
 	}
 }

@@ -81,7 +81,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA", 4, 0, 4);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA", 1, 0, 4);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 1, 1, Integer.MAX_VALUE);  
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
@@ -101,8 +101,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     @Override
     public void trainOnInstanceImpl(Instance inst) {
     	
-    	Instance rinst = inst;
-    	
+    	Instance rinst = inst.copy();
     	// Update the FS evaluator (no selection is applied here)
     	if(fsmethodOption.getValue() != 0) {
     		if(fselector == null) {
@@ -139,7 +138,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    	}
     		}
     		discretizer.updateEvaluator(inst);
-    		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
+    		//System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
     	}
     	
@@ -258,7 +257,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
             AutoExpandVector<AttributeClassObserver> attributeObservers) {
     	
     	// Feature selection process performed before
-    	Instance sinst = inst;
+    	Instance sinst = inst.copy();
     	if(fsmethodOption.getValue() != 0 && fselector != null) 
     		performFS(sinst);
     	if(discmethodOption.getValue() != 0 && discretizer != null) 
@@ -285,10 +284,11 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     // Naive Bayes Prediction using log10 for VFDR rules 
-    public double[] doNaiveBayesPredictionLog(Instance rinst,
+    public double[] doNaiveBayesPredictionLog(Instance inst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
     	
+    	Instance rinst = inst.copy();
     	// Feature selection process performed before
     	performFS(rinst);
     	

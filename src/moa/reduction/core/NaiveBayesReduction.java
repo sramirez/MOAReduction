@@ -138,7 +138,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    	}
     		}
     		discretizer.updateEvaluator(inst);
-    		//System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
+    		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
     	}
     	

@@ -6,15 +6,15 @@ MOAReduction is an extension for MOA, which allows to perform data reduction on 
 
 ## Installation and requirements
 
-In order to use the library and its reduction algorithms, please download MOAReduction.jar, jCOLIBRI2.jar (both modified) and weka.jar from the lib directory in this repository. Notice that only weka.jar can be downloaded from the official repository (the version used of weka is detailed in the NOTICE file). Then add all these libraries to the classpath when lauching MOA.
+In order to use the library and its reduction algorithms, please download MOAReduction.jar, jCOLIBRI2.jar (both modified), guava.jar and weka.jar from the lib directory in this repository. Notice that only weka.jar and guava (v20.0) can be downloaded from the official repository (the version used of weka is detailed in the NOTICE file). Then add all these libraries to the classpath when lauching MOA.
 
 Example (Windows):
 
-> java -cp .;lib/MOAReduction.jar;moa.jar;lib/weka.jar;lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
+> java -cp .;lib/MOAReduction.jar;moa.jar;lib/guava-20.0.jar;lib/weka.jar;lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
 
 Example (Linux/mac):
 
-> java -cp lib/MOAReduction.jar:moa.jar:lib/weka.jar:lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
+> java -cp lib/MOAReduction.jar:moa.jar:lib/guava-20.0.jar:lib/weka.jar:lib/jCOLIBRI2.jar -javaagent:sizeofag-1.0.0.jar moa.gui.GUI
 
 You can also unzip MOA's any of the JAR files, add the source code for the algorithms desired to MOA and recompile it.
 
@@ -80,7 +80,7 @@ Params:
 * -w winSize: batch size (default = 1)
 * -f numFeatures: number of features to select (default = 10)
 * -m fsMethod: feature selection method to apply. Options: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFS (default = 0)
-* -d discMethod: feature selection method to apply. Options: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge (default = 0)
+* -d discMethod: feature selection method to apply. Options: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA (default = 0)
 * -c numClasses: maximum number of classes involved in the problem (default = 100)
 
 The above parameters are common to the following discretization and feature selection methods: 
@@ -89,7 +89,7 @@ The above parameters are common to the following discretization and feature sele
 
 ### Partition Incremental Discretization algorithm (PiD)
 
-PiD performs incremental discretization. The basic idea is to perform the task in two layers. The first layer receives the sequence of input data and keeps some statistics on the data using many more intervals than required. Based on the statistics stored by the first layer, the second layer creates the final discretization. The proposed architecture processes streaming exam-
+PiD performs incremental discretization. The basic idea is to perform the task in two layers. The first layer receives the sequence of input data and keeps some statistics on the data using many more intervals than required. Based on the statistics stored by the first layer, the second layer creates the final discretization. The proposed architecture processes streaming exam
 ples in a single scan, in constant time and space even for infinite sequences of examples.
 
 *J. Gama, C. Pinto, Discretization from data streams: Applications to histograms and data mining, in: Proceedings of the 2006 ACM Sympo sium on Applied Computing, SAC ’06, 2006, pp. 662–667.*
@@ -108,6 +108,13 @@ Accordingly IFFD is able to incrementally adjust discretized intervals, effectiv
 
 *J. Lu, Y. Yang, G. I. Webb, Incremental discretization for Naive-bayes classifier, in: Proceedings of the Second International Conference on Advanced Data Mining and Applications, ADMA’06, 2006, pp. 223–
 238.*
+
+### Incremental Discretization Algorithm (IDA)
+
+Incremental Discretization Algorithm (IDA) approximates quantile-based discretization on the entire data stream
+encountered to date by maintaining a random sample of the data which is used to calculate the cut points. IDA uses the reservoir sampling algorithm to maintain a sample drawn uniformly at random from the entire stream up until the current time.
+
+*G. I. Webb. 2014. Contrary to Popular Belief Incremental Discretization can be Sound, Computationally Efficient and Extremely Useful for Streaming Data. In Proceedings of the 2014 IEEE International Conference on Data Mining (ICDM '14). IEEE Computer Society, Washington, DC, USA, 1031-1036.*
 
 ## Feature Selection:
 

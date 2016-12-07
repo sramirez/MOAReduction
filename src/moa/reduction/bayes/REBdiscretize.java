@@ -183,16 +183,22 @@ public class REBdiscretize extends MOADiscretize {
   
   private void fusinter(int att, List<Interval> intervals) {
 	int posMin = 0;
-	float difference;
 	globalDiff = Float.MIN_VALUE;
-	globalCrit = evalIntervals(intervals);
+	globalCrit = 0f;
 	float newMaxCrit = 0;
+	
+	/* Initialize criterion values and the global threshold */
+	for (Iterator<Interval> iterator = intervals.iterator(); iterator.hasNext();) {
+		Interval interval = (Interval) iterator.next();
+		interval.setCrit(evalInterval(interval.cd)); // Important 
+		globalCrit += interval.crit;		
+	}
 	
 	while(intervals.size() > 1) {
 		globalDiff = 0;
 		for(int i = 0; i < intervals.size() - 1; i++) {
 			float newCrit = evaluteMerge(globalCrit, intervals.get(i), intervals.get(i+1));
-			difference = globalCrit - newCrit;
+			float difference = globalCrit - newCrit;
 			if(difference > globalDiff){
 				posMin = i;
 				globalDiff = difference;
@@ -220,6 +226,23 @@ public class REBdiscretize extends MOADiscretize {
 	  return currentCrit - int1.crit - int2.crit + evalInterval(cds);
   }
   
+
+	
+	private float evalInterval(int cd[]) {
+		int Nj = 0;
+		float suma, factor;
+		for (int j = 0; j < numClasses; j++) {
+			Nj += cd[j];
+		}
+		suma = 0;
+		for (int j = 0; j < numClasses; j++) {
+			factor = (cd[j] + lambda) / (Nj + numClasses * lambda);
+			suma += factor * (1 - factor);
+		}
+		float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
+		return crit;
+	}
+  
   private List<Interval> initIntervals(int att, Integer[] idx) {
 		List <Interval> intervals = new LinkedList<Interval> ();
 		double valueAnt = sample[idx[0]].value(att);
@@ -240,61 +263,6 @@ public class REBdiscretize extends MOADiscretize {
 			}
 		}
 		return intervals;
-	}
-  
-  	private float evalIntervals (List<Interval> intervals) {
-  		return evalIntervals(intervals, Integer.MIN_VALUE);
-	}
-  	
-  	private float evalInterval(int cd[]) {
-		int Nj = 0;
-		float suma, factor;
-		for (int j = 0; j < numClasses; j++) {
-			Nj += cd[j];
-		}
-		suma = 0;
-		for (int j = 0; j < numClasses; j++) {
-			factor = (cd[j] + lambda) / (Nj + numClasses * lambda);
-			suma += factor * (1 - factor);
-		}
-		float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
-		return crit;
-	}
-
-	private float evalIntervals (List<Interval> intervals, int merged) {
-		int i, j;
-		int Nj;
-		float suma, factor, total = 0;
-		
-		for (i = 0; i < intervals.size(); i++) {
-			if (i == merged) {
-				Nj = 0;
-				for (j=0; j< numClasses; j++) {
-					Nj += intervals.get(i).cd[j];
-					Nj += intervals.get(i+1).cd[j];
-				}
-				suma = 0;
-				for (j=0; j< numClasses; j++) {
-					factor = (intervals.get(i).cd[j] + intervals.get(i+1).cd[j] + lambda) / (Nj + numClasses * lambda);
-					suma += factor * (1 - factor);
-				}
-				total += (alpha * ((float)Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
-			} else if (i != merged + 1) {
-				Nj = 0;
-				for (j=0; j < numClasses; j++) {
-					Nj += intervals.get(i).cd[j];
-				}
-				suma = 0;
-				for (j=0; j < numClasses; j++) {
-					factor = (intervals.get(i).cd[j] + lambda) / (Nj + numClasses * lambda);
-					suma += factor * (1 - factor);
-				}
-				float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
-				intervals.get(i).setCrit(crit);
-				total += crit;
-			}
-		}		
-		return total;
 	}
   
   

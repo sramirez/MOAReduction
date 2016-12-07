@@ -22,7 +22,7 @@ public class REBdiscretize extends MOADiscretize {
 	List<Interval>[] allIntervals;
 	Instance[] sample;
 	boolean init = false;
-	private float lambda, alpha;
+	private float lambda, alpha, globalCrit = 0f, globalDiff = 0f;
 	private static int MAX_OLD = 5;
 	
 	public REBdiscretize() {
@@ -52,6 +52,7 @@ public class REBdiscretize extends MOADiscretize {
 		int [] cd;
 		LinkedList<Float> oldPoints; // Implementation of an evicted stack
 		Multimap<Float, Integer> histogram;
+		float crit;
 		
 		/**
 		 * <p>
@@ -71,6 +72,7 @@ public class REBdiscretize extends MOADiscretize {
 			histogram.put(_end, _class);
 			cd = new int[numClasses];
 			cd[_class] = 1;
+			crit = Float.MIN_VALUE;
 		}
 		
 		public void addPoint(float value, int cls){
@@ -95,6 +97,10 @@ public class REBdiscretize extends MOADiscretize {
 				cd[i] += interv2.cd[i];
 			}
 			histogram.putAll(interv2.histogram);
+		}
+		
+		public void setCrit(float crit) {
+			this.crit = crit;
 		}
 	}
 
@@ -123,6 +129,7 @@ public class REBdiscretize extends MOADiscretize {
     
 	  if(totalCount > sample.length){
 		  if(init) {
+			  
 			 // Do nothing meanwhile 
 		  } else {
 			  batchFUSINTER();
@@ -137,7 +144,7 @@ public class REBdiscretize extends MOADiscretize {
   
   private void printIntervals(int att, List<Interval> intervals){
 	  System.out.println("Atributo: " + att);
-	  for (Iterator iterator = intervals.iterator(); iterator.hasNext();) {
+	  for (Iterator<Interval> iterator = intervals.iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
 		System.out.println(interval.label + "-" + interval.end + ",");
 	  }
@@ -175,34 +182,42 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private void fusinter(int att, List<Interval> intervals) {
-	boolean exit = false;
-	double criterion;
+	int posMin = 0;
+	float difference;
+	globalDiff = Float.MIN_VALUE;
+	globalCrit = evalIntervals(intervals);
+	float newMaxCrit = 0;
 	
-	while(intervals.size() > 1 && !exit) {
-		int posMin = -1;
-		double maxCri = 0;
-		double eval = evalIntervals(intervals);
+	while(intervals.size() > 1) {
+		globalDiff = 0;
 		for(int i = 0; i < intervals.size() - 1; i++) {
-			criterion = eval - evalIntervals(intervals, i);
-			if(posMin != -1) {
-				if(criterion > maxCri){
-					posMin=i;
-					maxCri = criterion;
-				}
-			} else {
+			float newCrit = evaluteMerge(globalCrit, intervals.get(i), intervals.get(i+1));
+			difference = globalCrit - newCrit;
+			if(difference > globalDiff){
 				posMin = i;
-				maxCri = criterion;
+				globalDiff = difference;
+				newMaxCrit = newCrit;
 			}
 		}
 	
-		if(maxCri > 0) {
+		if(globalDiff > 0) {
+			globalCrit = newMaxCrit;
 			Interval int1 = intervals.get(posMin);
-			Interval int2 = intervals.remove(posMin + 1);
+			Interval int2 = intervals.remove(posMin+1);
 			int1.mergeIntervals(int2);
 		} else {
-			exit = true;
+			break;
 		}
 	}
+  }
+  
+  // EvalIntervals must be executed before calling this method */
+  private float evaluteMerge(float currentCrit, Interval int1, Interval int2) {
+	  int[] cds = int1.cd.clone();
+	  for (int i = 0; i < cds.length; i++) {
+		cds[i] += int2.cd[i];
+	  }
+	  return currentCrit - int1.crit - int2.crit + evalInterval(cds);
   }
   
   private List<Interval> initIntervals(int att, Integer[] idx) {
@@ -212,7 +227,7 @@ public class REBdiscretize extends MOADiscretize {
 		Interval lastInterval =  new Interval(1, (float) valueAnt, classAnt);
 		intervals.add(lastInterval);
 	
-		for(int i= 1; i < sample.length;i++) {
+		for(int i = 1; i < sample.length;i++) {
 			double val = sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
 			if(val != valueAnt && clas != classAnt) {
@@ -227,16 +242,29 @@ public class REBdiscretize extends MOADiscretize {
 		return intervals;
 	}
   
-  	private double evalIntervals (List<Interval> intervals) {
+  	private float evalIntervals (List<Interval> intervals) {
   		return evalIntervals(intervals, Integer.MIN_VALUE);
 	}
+  	
+  	private float evalInterval(int cd[]) {
+		int Nj = 0;
+		float suma, factor;
+		for (int j = 0; j < numClasses; j++) {
+			Nj += cd[j];
+		}
+		suma = 0;
+		for (int j = 0; j < numClasses; j++) {
+			factor = (cd[j] + lambda) / (Nj + numClasses * lambda);
+			suma += factor * (1 - factor);
+		}
+		float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
+		return crit;
+	}
 
-	private double evalIntervals (List<Interval> intervals, int merged) {
+	private float evalIntervals (List<Interval> intervals, int merged) {
 		int i, j;
 		int Nj;
-		double suma;
-		double factor;
-		double total = 0;
+		float suma, factor, total = 0;
 		
 		for (i = 0; i < intervals.size(); i++) {
 			if (i == merged) {
@@ -261,7 +289,9 @@ public class REBdiscretize extends MOADiscretize {
 					factor = (intervals.get(i).cd[j] + lambda) / (Nj + numClasses * lambda);
 					suma += factor * (1 - factor);
 				}
-				total += (alpha * ((float)Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
+				float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
+				intervals.get(i).setCrit(crit);
+				total += crit;
 			}
 		}		
 		return total;

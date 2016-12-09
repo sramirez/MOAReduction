@@ -1,10 +1,15 @@
 package moa.reduction.bayes;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeMap;
 
 import moa.reduction.core.MOADiscretize;
 
@@ -19,15 +24,19 @@ public class REBdiscretize extends MOADiscretize {
 	 */
 	private static final long serialVersionUID = 1L;
 	private int totalCount, isample = 0, numClasses, numAttributes;
-	List<Interval>[] allIntervals;
+	TreeMap<Float, Interval>[] allIntervals;
 	Instance[] sample;
 	boolean init = false;
-	private float lambda, alpha, globalCrit = 0f, globalDiff = 0f;
+	private long seed = 317901561;
+	private float lambda, alpha, globalCrit = 0f, globalDiff = 0f, errorRate = 0.25f;
 	private static int MAX_OLD = 5;
+	private static float ERR_TH = 0.25f;
+	private Random rand;
 	
 	public REBdiscretize() {
 		// TODO Auto-generated constructor stub
 		setAttributeIndices("first-last");
+		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
 		this.sample = new Instance[1000];
@@ -40,76 +49,29 @@ public class REBdiscretize extends MOADiscretize {
 		this.lambda = lambda;
 		this.sample = new Instance[sampleSize];
 	}	
-	
-	class Interval {
-		/**
-		 * <p>
-		 * Interval class.
-		 * </p>
-		 */	
-		int label;
-		float end;
-		int [] cd;
-		LinkedList<Float> oldPoints; // Implementation of an evicted stack
-		Multimap<Float, Integer> histogram;
-		float crit;
-		
-		/**
-		 * <p>
-		 * Compute the interval ratios.
-		 * </p>
-		 * @param _attribute
-		 * @param []_values
-		 * @param _begin
-		 * @param _end
-		 */
-		public Interval(int _label, float _end, int _class) {
-			label = _label;
-			end = _end;
-			oldPoints = new LinkedList<Float>();
-			// Initialize histogram and class distribution
-			histogram = TreeMultimap.create();
-			histogram.put(_end, _class);
-			cd = new int[numClasses];
-			cd[_class] = 1;
-			crit = Float.MIN_VALUE;
-		}
-		
-		public void addPoint(float value, int cls){
-			histogram.put(value, cls);
-			// Update values
-			cd[cls]++;
-			label++;
-			if(value > end) 
-				end = value;
-		}
-		
-		public void mergeIntervals(Interval interv2){
-			label = (this.label > interv2.label) ? this.label : interv2.label;
-			float innerpoint = (this.end < interv2.end) ? this.end : interv2.end;
-			if(oldPoints.size() >= MAX_OLD)
-				oldPoints.pollFirst(); // Remove the oldest element
-			oldPoints.add(innerpoint);
-			// Set the new end
-			end = (this.end > interv2.end) ? this.end : interv2.end;
-			// Merge histograms and class distributions
-			for (int i = 0; i < cd.length; i++) {
-				cd[i] += interv2.cd[i];
-			}
-			histogram.putAll(interv2.histogram);
-		}
-		
-		public void setCrit(float crit) {
-			this.crit = crit;
-		}
-	}
+
 
 	public Instance applyDiscretization(Instance inst) {
-	  if(m_CutPoints != null)
-		  return convertInstance(inst);
-	  return inst;
+		  if(init){
+			  for (int i = 0; i < inst.numAttributes(); i++) {
+				 // if numeric and not missing, discretize
+				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
+					 double[] boundaries = new double[allIntervals[i].size()];
+					 for (int j = 0; j < allIntervals[i].size(); j++) {
+						boundaries[j] = allIntervals[i].get(j).end;
+					}
+					m_CutPoints[i] = boundaries;
+				 }
+			  }
+			  return convertInstance(inst);
+		  }		  
+		  return inst;
 	}
   
+  public void updateEvaluator(Instance instance, float errorRate) {	  
+	  this.errorRate = errorRate;
+	  updateEvaluator(instance);
+  }
   
   public void updateEvaluator(Instance instance) {	  
 	  if(m_CutPoints == null) {
@@ -117,32 +79,54 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
-		  
-	  /*for (int i = instance.numAttributes() - 1; i >= 0; i--) {
-		  if ((m_DiscretizeCols.isInRange(i))
-				  && (instance.attribute(i).isNumeric())
-				  && (instance.classIndex() != i)) {
-			  //updateLayer1(instance, i);
-    	  
-		  }
-	  }*/
     
 	  if(totalCount > sample.length){
 		  if(init) {
-			  
-			 // Do nothing meanwhile 
+			  boolean updated = updateSampleByError(instance);
 		  } else {
-			  batchFUSINTER();
+			  batchFusinter();
 			  for (int i = 0; i < allIntervals.length; i++) {
-				  printIntervals(i, allIntervals[i]);
+				  printIntervals(i, allIntervals[i].values());
 			  }
+			  init = true;
 		  }
 	  } else {
 		  sample[totalCount - 1] = instance;
 	  }
   }
   
-  private void printIntervals(int att, List<Interval> intervals){
+  private boolean updateSampleByError(Instance instance){
+	  boolean updated = false;
+	  Instance replacedInstance = null;
+	  if(rand.nextFloat() < errorRate + ERR_TH){
+		 int pos = isample % sample.length;
+		 replacedInstance = sample[pos];
+		 sample[pos] = instance; 
+		 updated = true;
+	  } 
+	  isample++;
+	  if(updated) {
+		  for (int i = 0; i < instance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+				 float val = (float) instance.value(i);
+				 Map.Entry<Float, Interval> entry = allIntervals[i].ceilingEntry(val);
+				 Interval interv = entry.getValue();
+				 Float prevKey = ((NavigableSet<Float>) interv.histogram.keySet()).floor(val);
+				 if(prevKey == null)
+					 
+				 if(prevKey != val){
+					 interv.histogram.get(prevKey);
+				 }
+				 Collection<Integer> vcls = interv.histogram.get((float) instance.value(i));				 
+			 }
+		  }
+		  
+	  }
+	  return updated;
+  }
+  
+  private void printIntervals(int att, Collection<Interval> intervals){
 	  System.out.println("Atributo: " + att);
 	  for (Iterator<Interval> iterator = intervals.iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
@@ -151,7 +135,7 @@ public class REBdiscretize extends MOADiscretize {
 	  
   }
   
-  private void batchFUSINTER() {
+  private void batchFusinter() {
 	  // TODO Auto-generated method stub
 	  float[][] sorted = new float[numAttributes][sample.length];
 	  
@@ -174,21 +158,21 @@ public class REBdiscretize extends MOADiscretize {
 			  });
 			  
 			  allIntervals[i] = initIntervals(i, idx);
-			  printIntervals(i, allIntervals[i]);
+			  printIntervals(i, allIntervals[i].values());
 			  fusinter(i, allIntervals[i]);
-			  printIntervals(i, allIntervals[i]);
+			  printIntervals(i, allIntervals[i].values());
 		  }
 	  }
   }
   
-  private void fusinter(int att, List<Interval> intervals) {
+  private void fusinter(int att, TreeMap <Float, Interval> intervals) {
 	int posMin = 0;
 	globalDiff = Float.MIN_VALUE;
 	globalCrit = 0f;
 	float newMaxCrit = 0;
 	
 	/* Initialize criterion values and the global threshold */
-	for (Iterator<Interval> iterator = intervals.iterator(); iterator.hasNext();) {
+	for (Iterator<Interval> iterator = intervals.values().iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
 		interval.setCrit(evalInterval(interval.cd)); // Important 
 		globalCrit += interval.crit;		
@@ -243,19 +227,19 @@ public class REBdiscretize extends MOADiscretize {
 		return crit;
 	}
   
-  private List<Interval> initIntervals(int att, Integer[] idx) {
-		List <Interval> intervals = new LinkedList<Interval> ();
+  private TreeMap <Float, Interval> initIntervals(int att, Integer[] idx) {
+		TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
 		double valueAnt = sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
 		Interval lastInterval =  new Interval(1, (float) valueAnt, classAnt);
-		intervals.add(lastInterval);
+		intervals.put((float) valueAnt, lastInterval);
 	
 		for(int i = 1; i < sample.length;i++) {
 			double val = sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
 			if(val != valueAnt && clas != classAnt) {
 				lastInterval = new Interval(i + 1, (float) val, clas);
-				intervals.add(lastInterval);
+				intervals.put((float) val, lastInterval);
 				valueAnt = val;
 				classAnt = clas;
 			} else {
@@ -270,10 +254,75 @@ public class REBdiscretize extends MOADiscretize {
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
 	  numClasses = inst.numClasses();
 	  numAttributes = inst.numAttributes();
-	  allIntervals = new LinkedList[numAttributes];
+	  allIntervals = new TreeMap[numAttributes];
+	  m_CutPoints = new double[numAttributes][];
 	  for (int i = 0; i < inst.numAttributes(); i++) {
-		  allIntervals[i] = new LinkedList<Interval>();
+		  allIntervals[i] = new TreeMap<Float, Interval>();
 	  }  
   }
+  
+	
+	class Interval {
+		/**
+		 * <p>
+		 * Interval class.
+		 * </p>
+		 */	
+		int label;
+		float end;
+		int [] cd;
+		LinkedList<Float> oldPoints; // Implemented as an evicted stack
+		Multimap<Float, Integer> histogram;
+		float crit;
+		
+		/**
+		 * <p>
+		 * Compute the interval ratios.
+		 * </p>
+		 * @param _attribute
+		 * @param []_values
+		 * @param _begin
+		 * @param _end
+		 */
+		public Interval(int _label, float _end, int _class) {
+			label = _label;
+			end = _end;
+			oldPoints = new LinkedList<Float>();
+			// Initialize histogram and class distribution
+			histogram = TreeMultimap.create();
+			histogram.put(_end, _class);
+			cd = new int[numClasses];
+			cd[_class] = 1;
+			crit = Float.MIN_VALUE;
+		}
+		
+		public void addPoint(float value, int cls){
+			histogram.put(value, cls);
+			// Update values
+			cd[cls]++;
+			label++;
+			if(value > end) 
+				end = value;
+		}
+		
+		public void mergeIntervals(Interval interv2){
+			label = (this.label > interv2.label) ? this.label : interv2.label;
+			float innerpoint = (this.end < interv2.end) ? this.end : interv2.end;
+			if(oldPoints.size() >= MAX_OLD)
+				oldPoints.pollFirst(); // Remove the oldest element
+			oldPoints.add(innerpoint);
+			// Set the new end
+			end = (this.end > interv2.end) ? this.end : interv2.end;
+			// Merge histograms and class distributions
+			for (int i = 0; i < cd.length; i++) {
+				cd[i] += interv2.cd[i];
+			}
+			histogram.putAll(interv2.histogram);
+		}
+		
+		public void setCrit(float crit) {
+			this.crit = crit;
+		}
+	}
 	
 }

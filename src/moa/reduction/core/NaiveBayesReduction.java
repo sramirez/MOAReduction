@@ -90,13 +90,14 @@ public class NaiveBayesReduction extends AbstractClassifier {
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
-    protected int totalCount = 0;
+    protected int totalCount = 0, classified = 0, correctlyClassified = 0;
     protected Set<Integer> selectedFeatures = new HashSet<Integer>();
     
     @Override
     public void resetLearningImpl() {
 	    this.observedClassDistribution = new DoubleVector();
         this.attributeObservers = new AutoExpandVector<AttributeClassObserver>();
+        totalCount = 0; classified = 0; correctlyClassified = 0;
     }
 
     @Override
@@ -140,7 +141,12 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    		discretizer = new REBdiscretize();
     	    	}
     		}
-    		discretizer.updateEvaluator(inst);
+    		if(discmethodOption.getValue() != 5)
+    			discretizer.updateEvaluator(inst);
+    		else
+        		// REBdiscretize needs to know the error rate before removing instances
+    			((REBdiscretize) discretizer).updateEvaluator(inst, 1 - ((float) correctlyClassified / classified)); 
+    			
     		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
     		rinst = discretizer.applyDiscretization(inst);
     	}
@@ -283,6 +289,18 @@ public class NaiveBayesReduction extends AbstractClassifier {
             }
         }
         // TODO: need logic to prevent underflow?
+        // Compute some statistics about classification performance
+        double maxValue = -1;
+        int maxIndex = -1;
+        for (int i = 0; i < votes.length; i++) {
+			if(votes[i] > maxValue){
+				maxIndex = i;
+				maxValue = votes[i];
+			}
+		}
+        if(maxIndex == inst.classIndex())
+        	correctlyClassified++;
+        classified++;
         return votes;
     }
 

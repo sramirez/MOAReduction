@@ -1,11 +1,13 @@
 package moa.reduction.bayes;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
@@ -57,10 +59,12 @@ public class REBdiscretize extends MOADiscretize {
 				 // if numeric and not missing, discretize
 				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
 					 double[] boundaries = new double[allIntervals[i].size()];
-					 for (int j = 0; j < allIntervals[i].size(); j++) {
-						boundaries[j] = allIntervals[i].get(j).end;
-					}
-					m_CutPoints[i] = boundaries;
+					 int j = 0;
+					 	for (Iterator iterator = allIntervals[i].values().iterator(); iterator
+					 			.hasNext();) {
+					 		boundaries[j++] = ((Interval) iterator.next()).end;
+					 	}
+					 	m_CutPoints[i] = boundaries;
 				 }
 			  }
 			  return convertInstance(inst);
@@ -170,18 +174,19 @@ public class REBdiscretize extends MOADiscretize {
 	globalDiff = Float.MIN_VALUE;
 	globalCrit = 0f;
 	float newMaxCrit = 0;
+	ArrayList<Interval> intervalList = new ArrayList<Interval>(intervals.values());
 	
 	/* Initialize criterion values and the global threshold */
-	for (Iterator<Interval> iterator = intervals.values().iterator(); iterator.hasNext();) {
+	for (Iterator<Interval> iterator = intervalList.iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
 		interval.setCrit(evalInterval(interval.cd)); // Important 
 		globalCrit += interval.crit;		
 	}
 	
-	while(intervals.size() > 1) {
+	while(intervalList.size() > 1) {
 		globalDiff = 0;
-		for(int i = 0; i < intervals.size() - 1; i++) {
-			float newCrit = evaluteMerge(globalCrit, intervals.get(i), intervals.get(i+1));
+		for(int i = 0; i < intervalList.size() - 1; i++) {
+			float newCrit = evaluteMerge(globalCrit, intervalList.get(i), intervalList.get(i+1));
 			float difference = globalCrit - newCrit;
 			if(difference > globalDiff){
 				posMin = i;
@@ -192,13 +197,18 @@ public class REBdiscretize extends MOADiscretize {
 	
 		if(globalDiff > 0) {
 			globalCrit = newMaxCrit;
-			Interval int1 = intervals.get(posMin);
-			Interval int2 = intervals.remove(posMin+1);
+			Interval int1 = intervalList.get(posMin);
+			Interval int2 = intervalList.remove(posMin+1);
 			int1.mergeIntervals(int2);
 		} else {
 			break;
 		}
 	}
+	allIntervals[att] = new TreeMap<Float, Interval>();
+	for (int i = 0; i < intervalList.size(); i++) {
+		allIntervals[att].put(intervalList.get(i).end, intervalList.get(i));
+	}
+	
   }
   
   // EvalIntervals must be executed before calling this method */
@@ -229,21 +239,24 @@ public class REBdiscretize extends MOADiscretize {
   
   private TreeMap <Float, Interval> initIntervals(int att, Integer[] idx) {
 		TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
-		double valueAnt = sample[idx[0]].value(att);
+		float valueAnt = (float) sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
-		Interval lastInterval =  new Interval(1, (float) valueAnt, classAnt);
-		intervals.put((float) valueAnt, lastInterval);
+		Interval lastInterval =  new Interval(1, valueAnt, classAnt);
+		intervals.put(valueAnt, lastInterval);
 	
 		for(int i = 1; i < sample.length;i++) {
-			double val = sample[idx[i]].value(att);
+			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
+			if(i == 416 && att == 3) {
+				System.out.println("Hola");
+			}
 			if(val != valueAnt && clas != classAnt) {
-				lastInterval = new Interval(i + 1, (float) val, clas);
-				intervals.put((float) val, lastInterval);
+				lastInterval = new Interval(i + 1, val, clas);
+				intervals.put(val, lastInterval);
 				valueAnt = val;
 				classAnt = clas;
 			} else {
-				lastInterval.addPoint((float) val, clas);
+				lastInterval.addPoint(val, clas);
 			}
 		}
 		return intervals;

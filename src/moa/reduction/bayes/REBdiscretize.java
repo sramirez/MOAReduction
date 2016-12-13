@@ -205,6 +205,7 @@ public class REBdiscretize extends MOADiscretize {
 		}
 	}
 	allIntervals[att] = new TreeMap<Float, Interval>();
+	// Update keys in the tree map
 	for (int i = 0; i < intervalList.size(); i++) {
 		allIntervals[att].put(intervalList.get(i).end, intervalList.get(i));
 	}
@@ -242,23 +243,20 @@ public class REBdiscretize extends MOADiscretize {
 		float valueAnt = (float) sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
 		Interval lastInterval =  new Interval(1, valueAnt, classAnt);
-		intervals.put(valueAnt, lastInterval);
 	
 		for(int i = 1; i < sample.length;i++) {
 			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
-			if(i == 416 && att == 3) {
-				System.out.println("Hola");
-			}
 			if(val != valueAnt && clas != classAnt) {
+				intervals.put(valueAnt, new Interval(lastInterval));
 				lastInterval = new Interval(i + 1, val, clas);
-				intervals.put(val, lastInterval);
-				valueAnt = val;
-				classAnt = clas;
 			} else {
 				lastInterval.addPoint(val, clas);
 			}
+			valueAnt = val;
+			classAnt = clas;
 		}
+		intervals.put(valueAnt, lastInterval);
 		return intervals;
 	}
   
@@ -275,7 +273,7 @@ public class REBdiscretize extends MOADiscretize {
   }
   
 	
-	class Interval {
+	class Interval implements Cloneable {
 		/**
 		 * <p>
 		 * Interval class.
@@ -309,6 +307,17 @@ public class REBdiscretize extends MOADiscretize {
 			crit = Float.MIN_VALUE;
 		}
 		
+		public Interval(Interval other) {
+			// TODO Auto-generated constructor stub
+			label = other.label;
+			end = other.end;
+			cd = other.cd.clone();
+			crit = other.crit;
+			oldPoints = new LinkedList<Float>(other.oldPoints);
+			histogram = TreeMultimap.create();
+			histogram.putAll(other.histogram);
+		}
+		
 		public void addPoint(float value, int cls){
 			histogram.put(value, cls);
 			// Update values
@@ -335,6 +344,12 @@ public class REBdiscretize extends MOADiscretize {
 		
 		public void setCrit(float crit) {
 			this.crit = crit;
+		}
+		
+		@Override
+		protected Object clone() throws CloneNotSupportedException {
+			// TODO Auto-generated method stub
+			return super.clone();
 		}
 	}
 	

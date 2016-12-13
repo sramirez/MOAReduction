@@ -6,11 +6,11 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 
 import moa.reduction.core.MOADiscretize;
@@ -30,7 +30,7 @@ public class REBdiscretize extends MOADiscretize {
 	Instance[] sample;
 	boolean init = false;
 	private long seed = 317901561;
-	private float lambda, alpha, globalCrit = 0f, globalDiff = 0f, errorRate = 0.25f;
+	private float lambda, alpha, globalCrit = 0f, errorRate = 0.25f;
 	private static int MAX_OLD = 5;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
@@ -109,25 +109,65 @@ public class REBdiscretize extends MOADiscretize {
 		 updated = true;
 	  } 
 	  isample++;
+	  
 	  if(updated) {
+
+		  int cls = (int) instance.classValue();
 		  for (int i = 0; i < instance.numAttributes(); i++) {
 			 // if numeric and not missing, discretize
 			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
 				 float val = (float) instance.value(i);
-				 Map.Entry<Float, Interval> entry = allIntervals[i].ceilingEntry(val);
-				 Interval interv = entry.getValue();
-				 Float prevKey = ((NavigableSet<Float>) interv.histogram.keySet()).floor(val);
-				 if(prevKey == null)
-					 
-				 if(prevKey != val){
-					 interv.histogram.get(prevKey);
+				 // Get the ceiling interval for the given value
+				 Map.Entry<Float, Interval> ceilingE = allIntervals[i].ceilingEntry(val);
+				 // If it is a boundary point, evaluate six different cutting alternatives
+				 // If not, just add the point to the interval
+				 if(isBoundary(ceilingE.getValue(), val, cls)){
+					 evaluateNewBoundary(allIntervals[i], ceilingE.getValue(), val, cls);
+				 } else {
+					 ceilingE.getValue().addPoint(val, cls);
 				 }
-				 Collection<Integer> vcls = interv.histogram.get((float) instance.value(i));				 
+				 
 			 }
 		  }
 		  
 	  }
 	  return updated;
+  }
+  
+  /** Intervals is updated here **/
+  private void evaluateNewBoundary(TreeMap<Float, Interval> intervals, Interval central, float val, int cls) {
+	  Map.Entry<Float, Interval> lowerE = intervals.lowerEntry(central.end);
+	  Map.Entry<Float, Interval> higherE = intervals.higherEntry(central.end);
+	  Interval splitI = central.splitInterval(val, cls);
+	  //int[][] nCd = evaluateSplit(ceilingE.getValue(), val, cls);
+	  LinkedList<Interval> intervalList = new LinkedList<Interval>();
+	  intervalList.add(lowerE.getValue()); intervalList.add(splitI);
+	  intervalList.add(central); intervalList.add(higherE.getValue());
+	  int oldSize = intervalList.size();
+	  // Apply fusinter locally
+	  fusinter(intervalList);
+	  // Remove old intervals and add new ones
+	  if(intervalList.size() < oldSize) {
+		  intervals.remove(lowerE.getKey()); intervals.remove(central.end);
+		  intervals.remove(higherE.getKey());
+		  for (Iterator<Interval> iterator = intervalList.iterator(); iterator
+				.hasNext();) {
+			  Interval interval = iterator.next();
+			  intervals.put(interval.end, interval);		
+		  }
+	 }
+  }
+  
+  private boolean isBoundary(Interval ceiling, float value, int clas){
+	  NavigableSet<Float> keys = (NavigableSet<Float>) ceiling.histogram.keySet();
+	  float greater = keys.ceiling(value);
+	  if(greater == value) 
+		  return false;
+	  Collection<Integer> vcls = ceiling.histogram.get(greater);
+	  if(vcls.contains(clas))
+		  return false;
+	  return true;
+	 
   }
   
   private void printIntervals(int att, Collection<Interval> intervals){
@@ -163,62 +203,54 @@ public class REBdiscretize extends MOADiscretize {
 			  
 			  allIntervals[i] = initIntervals(i, idx);
 			  printIntervals(i, allIntervals[i].values());
-			  fusinter(i, allIntervals[i]);
+			  ArrayList<Interval> intervalList = new ArrayList<Interval>(allIntervals[i].values());
+			  fusinter(intervalList);
+			  allIntervals[i] = new TreeMap<Float, Interval>();
+			  // Update keys in the tree map
+			  for (int j = 0; j < intervalList.size(); j++) {
+				allIntervals[i].put(intervalList.get(j).end, intervalList.get(j));
+			  }
 			  printIntervals(i, allIntervals[i].values());
 		  }
 	  }
   }
   
-  private void fusinter(int att, TreeMap <Float, Interval> intervals) {
-	int posMin = 0;
-	globalDiff = Float.MIN_VALUE;
-	globalCrit = 0f;
-	float newMaxCrit = 0;
-	ArrayList<Interval> intervalList = new ArrayList<Interval>(intervals.values());
-	
-	/* Initialize criterion values and the global threshold */
-	for (Iterator<Interval> iterator = intervalList.iterator(); iterator.hasNext();) {
-		Interval interval = (Interval) iterator.next();
-		interval.setCrit(evalInterval(interval.cd)); // Important 
-		globalCrit += interval.crit;		
-	}
+  private void fusinter(List<Interval> intervalList) {
 	
 	while(intervalList.size() > 1) {
-		globalDiff = 0;
+		float globalDiff = 0;
+		float maxGlobalCrit = 0;
+		int posMin = 0;
 		for(int i = 0; i < intervalList.size() - 1; i++) {
-			float newCrit = evaluteMerge(globalCrit, intervalList.get(i), intervalList.get(i+1));
-			float difference = globalCrit - newCrit;
+			float newLocalCrit = evaluteMerge(intervalList.get(i).cd, intervalList.get(i+1).cd);
+			float newGlobalCrit = globalCrit - intervalList.get(i).crit - intervalList.get(i+1).crit + newLocalCrit;
+			float difference = globalCrit - newGlobalCrit;
 			if(difference > globalDiff){
 				posMin = i;
 				globalDiff = difference;
-				newMaxCrit = newCrit;
+				maxGlobalCrit = newGlobalCrit;
 			}
 		}
 	
 		if(globalDiff > 0) {
-			globalCrit = newMaxCrit;
+			globalCrit = maxGlobalCrit;
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
-			int1.mergeIntervals(int2);
+			int1.mergeIntervals(int2);			
 		} else {
 			break;
 		}
-	}
-	allIntervals[att] = new TreeMap<Float, Interval>();
-	// Update keys in the tree map
-	for (int i = 0; i < intervalList.size(); i++) {
-		allIntervals[att].put(intervalList.get(i).end, intervalList.get(i));
 	}
 	
   }
   
   // EvalIntervals must be executed before calling this method */
-  private float evaluteMerge(float currentCrit, Interval int1, Interval int2) {
-	  int[] cds = int1.cd.clone();
+  private float evaluteMerge(int[] cd1, int[] cd2) {
+	  int[] cds = cd1.clone();
 	  for (int i = 0; i < cds.length; i++) {
-		cds[i] += int2.cd[i];
+		cds[i] += cd2[i];
 	  }
-	  return currentCrit - int1.crit - int2.crit + evalInterval(cds);
+	  return  evalInterval(cds);
   }
   
 
@@ -248,7 +280,10 @@ public class REBdiscretize extends MOADiscretize {
 			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
 			if(val != valueAnt && clas != classAnt) {
-				intervals.put(valueAnt, new Interval(lastInterval));
+				Interval nInt = new Interval(lastInterval);
+				nInt.updateCriterion();// Important
+				globalCrit += nInt.crit;		
+				intervals.put(valueAnt, nInt);
 				lastInterval = new Interval(i + 1, val, clas);
 			} else {
 				lastInterval.addPoint(val, clas);
@@ -271,9 +306,24 @@ public class REBdiscretize extends MOADiscretize {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 	  }  
   }
+    
+  private int[][] evaluateSplit(Interval original, float value, int cls){
+	  int[][] nCd = new int[2][original.cd.length];
+	  nCd[1] = original.cd.clone();
+	  nCd[0][cls]++;
+	  for (Iterator iterator = original.histogram.entries().iterator(); iterator.hasNext();) {
+		  Entry<Float, Integer> entry = (Entry) iterator.next();
+		  if(entry.getKey() <= value){
+			  nCd[0][entry.getValue()]++;
+			  nCd[1][entry.getValue()]--;
+		  }				
+	  }
+	  return nCd;
+	  
+  }
   
 	
-	class Interval implements Cloneable {
+	class Interval {
 		/**
 		 * <p>
 		 * Interval class.
@@ -285,6 +335,10 @@ public class REBdiscretize extends MOADiscretize {
 		LinkedList<Float> oldPoints; // Implemented as an evicted stack
 		Multimap<Float, Integer> histogram;
 		float crit;
+		
+		public Interval() {
+			// TODO Auto-generated constructor stub
+		}
 		
 		/**
 		 * <p>
@@ -298,8 +352,7 @@ public class REBdiscretize extends MOADiscretize {
 		public Interval(int _label, float _end, int _class) {
 			label = _label;
 			end = _end;
-			oldPoints = new LinkedList<Float>();
-			// Initialize histogram and class distribution
+			oldPoints = new LinkedList<Float>();			// Initialize histogram and class distribution
 			histogram = TreeMultimap.create();
 			histogram.put(_end, _class);
 			cd = new int[numClasses];
@@ -327,6 +380,40 @@ public class REBdiscretize extends MOADiscretize {
 				end = value;
 		}
 		
+		public Interval splitInterval(float value, int cls) {
+			TreeMultimap<Float, Integer> nHist = TreeMultimap.create();
+			int[] nCd = new int[cd.length];
+			LinkedList<Float> nOP = new LinkedList<Float>();
+			for (Iterator iterator = histogram.entries().iterator(); iterator.hasNext();) {
+				Entry<Float, Integer> entry = (Entry) iterator.next();
+				if(entry.getKey() <= value){
+					//histogram.entries().remove(entry);
+					nHist.put(entry.getKey(), entry.getValue());
+					nCd[entry.getValue()]++;
+					cd[entry.getValue()]--;
+					iterator.remove();
+				}				
+			}
+			// Split old points
+			for (Iterator iterator = oldPoints.iterator(); iterator.hasNext();) {
+				float float1 = (float) iterator.next();
+				if(float1 <= value){
+					nOP.add(float1);
+					iterator.remove();
+				}
+			}
+			this.setCrit(evalInterval(nCd));
+			/** New interval **/
+			Interval nInterval = new Interval();
+			nInterval.cd = nCd;
+			nInterval.histogram = nHist;
+			nInterval.oldPoints = nOP;
+			nInterval.label = this.label - this.histogram.size();
+			nInterval.addPoint(value, cls);
+			nInterval.setCrit(evalInterval(nCd));
+			return nInterval;
+		}
+		
 		public void mergeIntervals(Interval interv2){
 			label = (this.label > interv2.label) ? this.label : interv2.label;
 			float innerpoint = (this.end < interv2.end) ? this.end : interv2.end;
@@ -340,10 +427,15 @@ public class REBdiscretize extends MOADiscretize {
 				cd[i] += interv2.cd[i];
 			}
 			histogram.putAll(interv2.histogram);
+			setCrit(evaluteMerge(this.cd, interv2.cd));
 		}
 		
 		public void setCrit(float crit) {
 			this.crit = crit;
+		}
+		
+		public void updateCriterion(){
+			this.crit = evalInterval(cd);
 		}
 		
 		@Override

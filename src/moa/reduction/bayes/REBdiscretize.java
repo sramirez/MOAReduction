@@ -111,22 +111,60 @@ public class REBdiscretize extends MOADiscretize {
 	  isample++;
 	  
 	  if(updated) {
-
+		  // INSERTION
 		  int cls = (int) instance.classValue();
 		  for (int i = 0; i < instance.numAttributes(); i++) {
 			 // if numeric and not missing, discretize
 			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
 				 float val = (float) instance.value(i);
 				 // Get the ceiling interval for the given value
-				 Map.Entry<Float, Interval> ceilingE = allIntervals[i].ceilingEntry(val);
+				 Map.Entry<Float, Interval> centralE = allIntervals[i].ceilingEntry(val);
+				 Interval central = centralE.getValue();
 				 // If it is a boundary point, evaluate six different cutting alternatives
 				 // If not, just add the point to the interval
-				 if(isBoundary(ceilingE.getValue(), val, cls)){
-					 evaluateNewBoundary(allIntervals[i], ceilingE.getValue(), val, cls);
+				 if(isBoundary(central, val, cls)){
+					  // Add splitting point before dividing the interval
+					  central.addPoint(val, cls);
+					  Interval splitI = central.splitInterval(val);
+					  Map.Entry<Float, Interval> lowerE = allIntervals[i].lowerEntry(central.end);
+					  Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
+					  LinkedList<Interval> intervToEvaluate = new LinkedList<Interval>();
+					  intervToEvaluate.add(lowerE.getValue()); intervToEvaluate.add(central);
+					  intervToEvaluate.add(splitI); intervToEvaluate.add(higherE.getValue());
+					  localFusinter(allIntervals[i], intervToEvaluate);
 				 } else {
-					 ceilingE.getValue().addPoint(val, cls);
-				 }
-				 
+					 central.addPoint(val, cls);
+					 central.updateCriterion();
+					 if(centralE.getKey() != central.end) {
+						 allIntervals[i].remove(centralE.getKey());
+						 allIntervals[i].put(central.end, central);
+					 }						  
+				 }				 
+			 }
+		  }
+		  // REPLACED INSTANCE
+		  cls = (int) replacedInstance.classValue();
+		  for (int i = 0; i < replacedInstance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(replacedInstance.attribute(i).isNumeric() && !replacedInstance.isMissing(i)) {
+				 float val = (float) replacedInstance.value(i);
+				 // Find the interval containing the point to be removed
+				 Map.Entry<Float, Interval> ceilingE = allIntervals[i].ceilingEntry(val);
+				 Interval central = ceilingE.getValue();
+				 // Get the new interval from the splitting to test
+				 central.removePoint(val, cls);
+				 Interval nextInterval = central.splitByPrevMerge();				 
+
+				// Get the surrounding intervals around the chosen interval
+				 LinkedList<Interval> intervalList = new LinkedList<Interval>();
+				 Map.Entry<Float, Interval> lowerE = allIntervals[i].lowerEntry(central.end);
+				 Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
+				 intervalList.add(lowerE.getValue()); intervalList.add(central);
+				 if(nextInterval != null) 
+					 intervalList.add(nextInterval); 
+				 intervalList.add(higherE.getValue());				 
+				 // Evaluate changes in class distributions
+				 localFusinter(allIntervals[i], intervalList);				 
 			 }
 		  }
 		  
@@ -135,21 +173,19 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   /** Intervals is updated here **/
-  private void evaluateNewBoundary(TreeMap<Float, Interval> intervals, Interval central, float val, int cls) {
-	  Map.Entry<Float, Interval> lowerE = intervals.lowerEntry(central.end);
-	  Map.Entry<Float, Interval> higherE = intervals.higherEntry(central.end);
-	  Interval splitI = central.splitInterval(val, cls);
-	  //int[][] nCd = evaluateSplit(ceilingE.getValue(), val, cls);
-	  LinkedList<Interval> intervalList = new LinkedList<Interval>();
-	  intervalList.add(lowerE.getValue()); intervalList.add(splitI);
-	  intervalList.add(central); intervalList.add(higherE.getValue());
-	  int oldSize = intervalList.size();
+  private void localFusinter(TreeMap<Float, Interval> intervals, LinkedList<Interval> intervalList) {
+
+	  List<Interval> oldList = (List<Interval>) intervalList.clone();
 	  // Apply fusinter locally
 	  fusinter(intervalList);
 	  // Remove old intervals and add new ones
-	  if(intervalList.size() < oldSize) {
-		  intervals.remove(lowerE.getKey()); intervals.remove(central.end);
-		  intervals.remove(higherE.getKey());
+	  if(intervalList.size() < oldList.size()) {
+		  // Delete old intervals
+		  for (Iterator iterator = oldList.iterator(); iterator.hasNext();) {
+			Interval interval = (Interval) iterator.next();
+			intervals.remove(interval.end);
+		  }
+		  
 		  for (Iterator<Interval> iterator = intervalList.iterator(); iterator
 				.hasNext();) {
 			  Interval interval = iterator.next();
@@ -352,7 +388,7 @@ public class REBdiscretize extends MOADiscretize {
 		public Interval(int _label, float _end, int _class) {
 			label = _label;
 			end = _end;
-			oldPoints = new LinkedList<Float>();			// Initialize histogram and class distribution
+			oldPoints = new LinkedList<Float>();
 			histogram = TreeMultimap.create();
 			histogram.put(_end, _class);
 			cd = new int[numClasses];
@@ -380,7 +416,28 @@ public class REBdiscretize extends MOADiscretize {
 				end = value;
 		}
 		
-		public Interval splitInterval(float value, int cls) {
+		public void removePoint(float value, int cls) {
+			histogram.remove(value, cls);
+			cd[cls]--;
+			label--;
+			if(value == end) {
+				NavigableSet<Float> keyset = (NavigableSet<Float>) histogram.keySet();
+				Float nend = keyset.floor(value); // get the new maximum
+				if(nend != null)
+					end = nend;
+				else
+					end = -1;
+			}
+		}
+		
+		public Interval splitByPrevMerge() {			
+			Float value = oldPoints.pollLast();
+			if(value != null)
+				return splitInterval(value);
+			return null;
+		}
+		
+		public Interval splitInterval(float value) {
 			TreeMultimap<Float, Integer> nHist = TreeMultimap.create();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
@@ -409,7 +466,7 @@ public class REBdiscretize extends MOADiscretize {
 			nInterval.histogram = nHist;
 			nInterval.oldPoints = nOP;
 			nInterval.label = this.label - this.histogram.size();
-			nInterval.addPoint(value, cls);
+			//nInterval.addPoint(value, cls);
 			nInterval.setCrit(evalInterval(nCd));
 			return nInterval;
 		}
@@ -438,11 +495,6 @@ public class REBdiscretize extends MOADiscretize {
 			this.crit = evalInterval(cd);
 		}
 		
-		@Override
-		protected Object clone() throws CloneNotSupportedException {
-			// TODO Auto-generated method stub
-			return super.clone();
-		}
 	}
 	
 }

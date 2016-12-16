@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -12,7 +13,10 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
+
+import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 
 import moa.reduction.core.MOADiscretize;
 
@@ -70,11 +74,15 @@ public class REBdiscretize extends MOADiscretize {
 				 // if numeric and not missing, discretize
 				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
 					 double[] boundaries = new double[allIntervals[i].size()];
+					 String[] labels = new String[allIntervals[i].size()];
 					 int j = 0;
-					 	for (Iterator iterator = allIntervals[i].values().iterator(); iterator
+					 	for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
 					 			.hasNext();) {
-					 		boundaries[j++] = ((Interval) iterator.next()).label;
+					 		Interval interv = iterator.next();
+					 		labels[j] = Integer.toString(interv.label);
+					 		boundaries[j++] = interv.end;
 					 	}
+					 	m_Labels[i] = labels;
 					 	m_CutPoints[i] = boundaries;
 				 }
 			  }
@@ -123,7 +131,27 @@ public class REBdiscretize extends MOADiscretize {
 	  
 	  if(updated) {
 		  insertExample(instance);
-		  deleteExample(replacedInstance);		  
+
+		  Set<Integer> labels = new HashSet<Integer>();
+		  for (Iterator iterator = allIntervals[0].values().iterator(); iterator
+				.hasNext();) {
+			Interval interval = (Interval) iterator.next();
+			if(labels.contains(interval.label))
+				System.err.println("Asd");
+			labels.add(interval.label);
+			
+		  }
+		  deleteExample(replacedInstance);
+
+		  labels = new HashSet<Integer>();
+		  for (Iterator iterator = allIntervals[0].values().iterator(); iterator
+				.hasNext();) {
+			Interval interval = (Interval) iterator.next();
+			if(labels.contains(interval.label))
+				System.err.println("Asd");
+			labels.add(interval.label);
+			
+		  }
 	  }
 	  return updated;
   }
@@ -148,7 +176,7 @@ public class REBdiscretize extends MOADiscretize {
 					  allIntervals[i].remove(centralE.getKey());
 					  // Add splitting point before dividing the interval
 					  central.addPoint(val, cls);
-					  Interval splitI = central.splitInterval(labelsToUse.poll(), val);
+					  Interval splitI = central.splitInterval(labelsToUse, val);
 					  Map.Entry<Float, Interval> lowerE = allIntervals[i].lowerEntry(central.end);
 					  Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
 					  LinkedList<Interval> intervalList = new LinkedList<Interval>();
@@ -165,6 +193,15 @@ public class REBdiscretize extends MOADiscretize {
 						  allIntervals[i].remove(higherE.getKey());
 					  }
 					  evaluateLocalMerges(intervalList);
+					  Set<Integer> labels = new HashSet<Integer>();
+					  for (Iterator iterator = intervalList.iterator(); iterator
+							.hasNext();) {
+						Interval interval = (Interval) iterator.next();
+						if(labels.contains(interval.label))
+							System.err.println("Asd");
+						labels.add(interval.label);
+						
+					  }
 					  insertIntervals(i, intervalList);
 				 } else {
 					 // If not, just add the point to the interval
@@ -179,7 +216,7 @@ public class REBdiscretize extends MOADiscretize {
 			 } else {
 				 // New interval with a new maximum limit
 				 Map.Entry<Float, Interval> priorE = allIntervals[i].lowerEntry(val);
-				 Interval nInt = new Interval(priorE.getValue().label + 1, val, cls);
+				 Interval nInt = new Interval(labelsToUse.poll(), val, cls);
 				 allIntervals[i].put(val, nInt);
 			 }
 		 }
@@ -201,12 +238,18 @@ public class REBdiscretize extends MOADiscretize {
 				 Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
 				 // Delete surrounding interval before starting
 				 LinkedList<Interval> intervalList = new LinkedList<Interval>();
-				 if(lowerE != null)
+				 if(lowerE != null) {					 
 					 intervalList.add(lowerE.getValue());
-				 if(central != null)
+					 allIntervals[i].remove(lowerE.getKey());
+				 }
+				 if(central != null){					 
 					 intervalList.add(central);
-				 if(higherE != null)
-					 intervalList.add(higherE.getValue());	
+					 allIntervals[i].remove(ceilingE.getKey());
+				 }
+				 if(higherE != null) {					 
+					 intervalList.add(higherE.getValue());
+					 allIntervals[i].remove(higherE.getKey());
+				 }
 				 
 				 // Get the new interval from the splitting to test (if it is not the last interval and point)
 				 if(!(allIntervals[i].size() == 1 && central.histogram.size() == 1)) {
@@ -229,7 +272,7 @@ public class REBdiscretize extends MOADiscretize {
 					 //}
 					 central = null;
 				 } else {
-					 splittedInterval = central.splitByPrevMerge(labelsToUse.poll());
+					 splittedInterval = central.splitByPrevMerge(labelsToUse);
 				 }
 				 // Get the surrounding intervals around the chosen interval
 				 intervalList = new LinkedList<Interval>();
@@ -244,6 +287,15 @@ public class REBdiscretize extends MOADiscretize {
 				 // Evaluate changes in class distributions (allIntervals is updated)
 				 evaluateLocalMerges(intervalList);		
 				 insertIntervals(i, intervalList);
+				 Set<Integer> labels = new HashSet<Integer>();
+				  for (Iterator iterator = intervalList.iterator(); iterator
+						.hasNext();) {
+					Interval interval = (Interval) iterator.next();
+					if(labels.contains(interval.label))
+						System.err.println("Asd");
+					labels.add(interval.label);
+					
+				  }
 			 }		 
 		 }
 	  }
@@ -394,7 +446,8 @@ public class REBdiscretize extends MOADiscretize {
 				nInt.updateCriterion();// Important
 				globalCrit += nInt.crit;		
 				intervals.put(valueAnt, nInt);
-				lastInterval = new Interval(i + 1, val, clas);
+				int newindex = labelsToUse.poll();
+				lastInterval = new Interval(newindex, val, clas);
 			} else {
 				lastInterval.addPoint(val, clas);
 			}
@@ -412,6 +465,7 @@ public class REBdiscretize extends MOADiscretize {
 	  numAttributes = inst.numAttributes();
 	  allIntervals = new TreeMap[numAttributes];
 	  m_CutPoints = new double[numAttributes][];
+	  m_Labels = new String[numAttributes][];
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 	  }  
@@ -469,7 +523,6 @@ public class REBdiscretize extends MOADiscretize {
 			histogram.put(value, cls);
 			// Update values
 			cd[cls]++;
-			label++;
 			if(value > end) 
 				end = value;
 		}
@@ -477,7 +530,6 @@ public class REBdiscretize extends MOADiscretize {
 		public void removePoint(float value, int cls) {
 			histogram.remove(value, cls);
 			cd[cls]--;
-			label--;
 			if(value == end) {
 				NavigableSet<Float> keyset = (NavigableSet<Float>) histogram.keySet();
 				Float nend = keyset.floor(value); // get the new maximum
@@ -486,14 +538,14 @@ public class REBdiscretize extends MOADiscretize {
 			}
 		}
 		
-		public Interval splitByPrevMerge(int nlabel) {			
+		public Interval splitByPrevMerge(Queue<Integer> labels) {			
 			Float value = oldPoints.pollLast();
 			if(value != null)
-				return splitInterval(nlabel, value);
+				return splitInterval(labels, value);
 			return null;
 		}
 		
-		public Interval splitInterval(int nlabel, float value) {
+		public Interval splitInterval(Queue<Integer> labels, float value) {
 			TreeMultimap<Float, Integer> nHist = TreeMultimap.create();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
@@ -520,13 +572,14 @@ public class REBdiscretize extends MOADiscretize {
 			
 			/** New interval (which lays at the right of the cut point) **/
 			Interval nInterval = new Interval();
-			if(histogram.size() > nInterval.histogram.size()){
-				nInterval.label = nlabel;
+			if(histogram.size() > nHist.size()){
+				nInterval.label = labelsToUse.poll();
 			} else {
 				nInterval.label = this.label;
-				this.label = nlabel;
+				this.label = labelsToUse.poll();
 			}				
-			nInterval.label = nlabel;
+			if(label == nInterval.label)
+				System.err.println("asd");
 			nInterval.cd = nCd;
 			nInterval.histogram = nHist;
 			nInterval.oldPoints = nOP;

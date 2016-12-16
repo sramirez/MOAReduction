@@ -29,6 +29,8 @@ public abstract class MOADiscretize extends Filter {
 	/** Store the current cutpoints */
 	protected double[][] m_CutPoints = null;
 	
+	protected String[][] m_Labels = null;
+	
 	/** Output binary attributes for discretized attributes. */
 	protected boolean m_MakeBinary = false;
 	
@@ -350,7 +352,16 @@ public abstract class MOADiscretize extends Filter {
 	          attribValues.add("'All'");
 	        } else {
 	          attribValues = new ArrayList<String>(cutPoints.length + 1);
-	          if (m_UseBinNumbers) {
+	          boolean predefinedLabels = false;
+	          if(m_Labels != null) {
+	        	  if(m_Labels[i].length == m_CutPoints[i].length)
+	        		  predefinedLabels = true;
+	          }
+	          if(predefinedLabels) {
+	        	  for (int j = 0; j < m_Labels[i].length; j++) {
+		              attribValues.add(m_Labels[i][j]);
+	        	  }  
+	          } else if (m_UseBinNumbers) {
 	            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
 	              attribValues.add("'B" + (j + 1) + "of" + (n + 1) + "'");
 	            }

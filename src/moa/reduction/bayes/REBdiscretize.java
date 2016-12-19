@@ -10,7 +10,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
@@ -18,8 +17,6 @@ import java.util.TreeMap;
 
 import moa.reduction.core.MOADiscretize;
 
-import com.google.common.collect.Multimap;
-import com.google.common.collect.TreeMultimap;
 import com.yahoo.labs.samoa.instances.Instance;
 
 public class REBdiscretize extends MOADiscretize {
@@ -33,11 +30,12 @@ public class REBdiscretize extends MOADiscretize {
 	Instance[] sample;
 	boolean init = false;
 	private long seed = 317901561;
-	private float lambda, alpha, globalCrit = 0f, errorRate = 0.25f;
+	private float lambda, alpha, errorRate = 0.25f;
 	private static int MAX_OLD = 5;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
 	private Queue<Integer>[] labelsToUse; 
+	private float[] globalCrits;
 	
 	public REBdiscretize() {
 		// TODO Auto-generated constructor stub
@@ -116,6 +114,8 @@ public class REBdiscretize extends MOADiscretize {
   private boolean updateSampleByError(Instance instance){
 	  boolean updated = false;
 	  Instance replacedInstance = null;
+	  if(totalCount == 1008)
+		  System.err.println("asd");
 	  if(rand.nextFloat() < errorRate + ERR_TH){
 		 int pos = isample % sample.length;
 		 replacedInstance = sample[pos];
@@ -125,10 +125,28 @@ public class REBdiscretize extends MOADiscretize {
 	  isample++;
 	  
 	  if(updated) {
-		  insertExample(instance);
-		  checkIntervals(instance);
-		  deleteExample(replacedInstance);
-		  checkIntervals(instance);
+		  for (int i = 0; i < instance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+				 
+				 if(i == 4) {
+					  System.out.println("Global Crit: " + globalCrits[i]);
+					  System.out.println("Size: " + allIntervals[i].size());
+				  }
+				  insertExample(i, instance);
+				  if(i == 4) {
+					  System.out.println("Global Crit: " + globalCrits[i]);
+					  System.out.println("Size: " + allIntervals[i].size());
+				  }
+				  checkIntervals(instance);
+				  deleteExample(i, replacedInstance);
+				  checkIntervals(instance);
+				  if(i == 4) {
+					  System.out.println("Global Crit: " + globalCrits[i]);
+					  System.out.println("Size: " + allIntervals[i].size());
+				  }
+			 }
+		  }
 	  }
 	  return updated;
   }
@@ -148,151 +166,126 @@ public class REBdiscretize extends MOADiscretize {
 		 }
   }
   
-  private void insertExample(Instance instance){
-	  // INSERTION
-	  int cls = (int) instance.classValue();
-	  for (int i = 0; i < instance.numAttributes(); i++) {
-		 // if numeric and not missing, discretize
-		 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-			 float val = (float) instance.value(i);
-			 // Get the ceiling interval for the given value
-			 Map.Entry<Float, Interval> centralE = allIntervals[i].ceilingEntry(val);
-			 // The point is within the range defined by centralE, if not a new maximum interval is created
-			 if(centralE != null) {
-				 Interval central = centralE.getValue();
-				 // If it is a boundary point, evaluate six different cutting alternatives
-				 if(isBoundary(central, val, cls)){
-					  // remove before changing end value in central
-					  allIntervals[i].remove(centralE.getKey());
-					  // Add splitting point before dividing the interval
-					  central.addPoint(val, cls);
-					  Interval splitI = central.splitInterval(i, val);
-					  Map.Entry<Float, Interval> lowerE = allIntervals[i].lowerEntry(central.end);
-					  Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
-					  LinkedList<Interval> intervalList = new LinkedList<Interval>();
-					  // Insert in the specific order
-					  if(lowerE != null) {
-						 intervalList.add(lowerE.getValue());
-						 allIntervals[i].remove(lowerE.getKey());
-					  }
-					  intervalList.add(central);
-					  if(splitI != null)
-						  intervalList.add(splitI); 
-					  if(higherE != null) {
-						  intervalList.add(higherE.getValue());
-						  allIntervals[i].remove(higherE.getKey());
-					  }
-					  Set<Integer> labels2 = new HashSet<Integer>();
-						 for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-					 			.hasNext();) {
-					 		Interval interv = iterator.next();
-					 		
-					 		if(labels2.contains(interv.label))
-								System.err.println("Asd");
-							labels2.add(interv.label);
-
-					 	}
-					  evaluateLocalMerges(i, intervalList);	
-					  labels2 = new HashSet<Integer>();
-						 for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-					 			.hasNext();) {
-					 		Interval interv = iterator.next();
-					 		
-					 		if(labels2.contains(interv.label))
-								System.err.println("Asd");
-							labels2.add(interv.label);
-
-					 	}
-					  insertIntervals(i, intervalList);
-					  checkIntervals(instance);
-				 } else {
-					 // If not, just add the point to the interval
-					 central.addPoint(val, cls);
-					 central.updateCriterion();
-					 // Update the key with the bigger end
-					 if(centralE.getKey() != central.end) {
-						 allIntervals[i].remove(centralE.getKey());
-						 allIntervals[i].put(central.end, central);
-					 }						  
-				 }
-			 } else {
-				 // New interval with a new maximum limit
-				 Map.Entry<Float, Interval> priorE = allIntervals[i].lowerEntry(val);
-				 Interval nInt = new Interval(labelsToUse[i].poll(), val, cls);
-				 allIntervals[i].put(val, nInt);
-				 checkIntervals(instance);
-			 }
+  private void insertExample(int att, Instance instance){
+  	 // INSERTION
+     int cls = (int) instance.classValue();
+	 float val = (float) instance.value(att);
+	 if(val == 0.041161 && cls == 1)
+		 System.err.println("as");
+	 // Get the ceiling interval for the given value
+	 Map.Entry<Float, Interval> centralE = allIntervals[att].ceilingEntry(val);
+	 // The point is within the range defined by centralE, if not a new maximum interval is created
+	 if(centralE != null) {
+		 Interval central = centralE.getValue();
+		 // If it is a boundary point, evaluate six different cutting alternatives
+		 if(isBoundary(central, val, cls)){
+			  // remove before changing end value in central
+			  allIntervals[att].remove(centralE.getKey());
+			  // Add splitting point before dividing the interval
+			  central.addPoint(val, cls);
+			  Interval splitI = central.splitInterval(att, val);
+			  Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
+			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
+			  LinkedList<Interval> intervalList = new LinkedList<Interval>();
+			  // Insert in the specific order
+			  if(lowerE != null) {
+				 intervalList.add(lowerE.getValue());
+				 allIntervals[att].remove(lowerE.getKey());
+			  }
+			  intervalList.add(central);
+			  if(splitI != null)
+				  intervalList.add(splitI); 
+			  if(higherE != null) {
+				  intervalList.add(higherE.getValue());
+				  allIntervals[att].remove(higherE.getKey());
+			  }
+			  evaluateLocalMerges(att, intervalList);
+			  insertIntervals(att, intervalList);
+			  checkIntervals(instance);
+		 } else {
+			 // If not, just add the point to the interval
+			 central.addPoint(val, cls);
+			 central.updateCriterion();
+			 // Update the key with the bigger end
+			 if(centralE.getKey() != central.end) {
+				 allIntervals[att].remove(centralE.getKey());
+				 allIntervals[att].put(central.end, central);
+			 }						  
 		 }
-	  }
+	 } else {
+		 // New interval with a new maximum limit
+		 Map.Entry<Float, Interval> priorE = allIntervals[att].lowerEntry(val);
+		 Interval nInt = new Interval(labelsToUse[att].poll(), val, cls);
+		 allIntervals[att].put(val, nInt);
+		 checkIntervals(instance);
+	 }
   }
   
-  private void deleteExample(Instance instance) {
-	  // REPLACED INSTANCE
-	  int cls = (int) instance.classValue();
-	  for (int i = 0; i < instance.numAttributes(); i++) {
-		 // if numeric and not missing, discretize
-		 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-			 float val = (float) instance.value(i);
-			 // Find the interval containing the point to be removed
-			 Map.Entry<Float, Interval> ceilingE = allIntervals[i].ceilingEntry(val);
-			 if(ceilingE != null){ // The point must be contained in any previously inserted interval
-				 Interval central = ceilingE.getValue();
-				 Map.Entry<Float, Interval> lowerE = allIntervals[i].lowerEntry(central.end);
-				 Map.Entry<Float, Interval> higherE = allIntervals[i].higherEntry(central.end);
-				 // Delete surrounding interval before starting
-				 LinkedList<Interval> intervalList = new LinkedList<Interval>();
-				 if(lowerE != null) {					 
-					 intervalList.add(lowerE.getValue());
-					 allIntervals[i].remove(lowerE.getKey());
-				 }
-				 if(central != null){					 
-					 intervalList.add(central);
-					 allIntervals[i].remove(ceilingE.getKey());
-				 }
-				 if(higherE != null) {					 
-					 intervalList.add(higherE.getValue());
-					 allIntervals[i].remove(higherE.getKey());
-				 }
-				 
-				 // Get the new interval from the splitting to test (if it is not the last interval and point)
-				 if(!(allIntervals[i].size() == 1 && central.histogram.size() == 1)) {
-					 // remove before changing end value in central
-					 //allIntervals[i].remove(ceilingE.getKey());
-					 central.removePoint(val, cls);
-				 }
-				 Interval splittedInterval = null;
-				 // If central is empty, so we merge it with its prior interval or we just remove it
-				 if(central.histogram.isEmpty()){
-					 if(lowerE != null) {
-						 //allIntervals[i].remove(lowerE.getKey());
-						 int oldlab = lowerE.getValue().mergeIntervals(central);
-						 labelsToUse[i].add(oldlab);
-						 // Replace old end with the new compelling interval 
-						 //allIntervals[i].put(lowerE.getValue().end, lowerE.getValue());	 
-					 }// else {
-						 // Just remove central from map
-						 //allIntervals[i].remove(central.end);
-					 //}
-					 central = null;
-				 } else {
-					 splittedInterval = central.splitByPrevMerge(i);
-				 }
-				 // Get the surrounding intervals around the chosen interval
-				 intervalList = new LinkedList<Interval>();
-				 if(lowerE != null)
-					 intervalList.add(lowerE.getValue());
-				 if(central != null)
-					 intervalList.add(central);
-				 if(splittedInterval != null) 
-					 intervalList.add(splittedInterval); 
-				 if(higherE != null)
-					 intervalList.add(higherE.getValue());				 
-				 // Evaluate changes in class distributions (allIntervals is updated)
-				 evaluateLocalMerges(i, intervalList);		
-				 insertIntervals(i, intervalList);
-			 }		 
+  private void deleteExample(int att, Instance instance) {
+	 int cls = (int) instance.classValue();
+	 float val = (float) instance.value(att);
+	 if(val == 0.041161 && cls == 1)
+		 System.err.println("as");
+	 // Find the interval containing the point to be removed
+	 Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(val);
+	 if(ceilingE != null){ // The point must be contained in any previously inserted interval
+		 Interval central = ceilingE.getValue();
+		 Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
+		 Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
+		 // Delete surrounding interval before starting
+		 LinkedList<Interval> intervalList = new LinkedList<Interval>();
+		 if(lowerE != null) {					 
+			 intervalList.add(lowerE.getValue());
+			 allIntervals[att].remove(lowerE.getKey());
 		 }
-	  }
+		 if(central != null){					 
+			 intervalList.add(central);
+			 allIntervals[att].remove(ceilingE.getKey());
+		 }
+		 if(higherE != null) {					 
+			 intervalList.add(higherE.getValue());
+			 allIntervals[att].remove(higherE.getKey());
+		 }
+		 
+		 // Get the new interval from the splitting to test (if it is not the last interval and point)
+		 if(allIntervals[att].size() > 1 && central.histogram.size() > 1) {
+			 // remove before changing end value in central
+			 //allIntervals[i].remove(ceilingE.getKey());
+			 if(val == 0.041161)
+				 System.err.println("asd");
+			 central.removePoint(val, cls);
+		 }
+		 Interval splittedInterval = null;
+		 // If central is empty, so we merge it with its prior interval or we just remove it
+		 if(central.histogram.isEmpty()){
+			 if(lowerE != null) {
+				 //allIntervals[i].remove(lowerE.getKey());
+				 int oldlab = lowerE.getValue().mergeIntervals(central);
+				 labelsToUse[att].add(oldlab);
+				 // Replace old end with the new compelling interval 
+				 //allIntervals[i].put(lowerE.getValue().end, lowerE.getValue());	 
+			 }// else {
+				 // Just remove central from map
+				 //allIntervals[i].remove(central.end);
+			 //}
+			 central = null;
+		 } else {
+			 splittedInterval = central.splitByPrevMerge(att);
+		 }
+		 // Get the surrounding intervals around the chosen interval
+		 intervalList = new LinkedList<Interval>();
+		 if(lowerE != null)
+			 intervalList.add(lowerE.getValue());
+		 if(central != null)
+			 intervalList.add(central);
+		 if(splittedInterval != null) 
+			 intervalList.add(splittedInterval); 
+		 if(higherE != null)
+			 intervalList.add(higherE.getValue());				 
+		 // Evaluate changes in class distributions (allIntervals is updated)
+		 evaluateLocalMerges(att, intervalList);		
+		 insertIntervals(att, intervalList);
+	 }
   }
   
   private void deleteSurroundingIntervals(int att, LinkedList<Interval> intervalList){
@@ -315,15 +308,13 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private boolean isBoundary(Interval ceiling, float value, int clas){
-	  NavigableSet<Float> keys = (NavigableSet<Float>) ceiling.histogram.keySet();
-	  Float greater = keys.ceiling(value);
+	  Entry<Float, int[]> greater = ceiling.histogram.ceilingEntry(value);
 	  // The new greatest point in the attribute
 	  if(greater == null)
 		  return true;
-	  if(greater == value) 
+	  if(greater.getKey() == value) 
 		  return false;
-	  Collection<Integer> vcls = ceiling.histogram.get(greater);
-	  if(vcls.contains(clas))
+	  if(greater.getValue()[clas] > 0)
 		  return false;
 	  return true;
 	 
@@ -381,8 +372,10 @@ public class REBdiscretize extends MOADiscretize {
 		int posMin = 0;
 		for(int i = 0; i < intervalList.size() - 1; i++) {
 			float newLocalCrit = evaluteMerge(intervalList.get(i).cd, intervalList.get(i+1).cd);
-			float newGlobalCrit = globalCrit - intervalList.get(i).crit - intervalList.get(i+1).crit + newLocalCrit;
-			float difference = globalCrit - newGlobalCrit;
+			float newGlobalCrit = globalCrits[att] - intervalList.get(i).crit - intervalList.get(i+1).crit + newLocalCrit;
+			if(Float.isInfinite(newGlobalCrit))
+				System.out.println("Error");
+			float difference = globalCrits[att] - newGlobalCrit;
 			if(difference > globalDiff){
 				posMin = i;
 				globalDiff = difference;
@@ -391,12 +384,10 @@ public class REBdiscretize extends MOADiscretize {
 		}
 	
 		if(globalDiff > 0) {
-			globalCrit = maxGlobalCrit;
+			globalCrits[att] = maxGlobalCrit;
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
 			int oldlab = int1.mergeIntervals(int2);
-			if(labelsToUse[att].contains(oldlab))
-				System.out.println("asd");
 			labelsToUse[att].add(oldlab);
 		} else {
 			break;
@@ -433,14 +424,20 @@ public class REBdiscretize extends MOADiscretize {
 		float valueAnt = (float) sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
 		Interval lastInterval =  new Interval(labelsToUse[att].poll(), valueAnt, classAnt);
-	
+		if(valueAnt == 0.041161 && classAnt == 1)
+			System.err.println("asd");
 		for(int i = 1; i < sample.length;i++) {
+			if(att == 3) {
+				System.err.println("asd");
+			}
 			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
+			if(val == 0.041161 && clas == 1)
+				System.err.println("asd");
 			if(val != valueAnt && clas != classAnt) {
 				Interval nInt = new Interval(lastInterval);
 				nInt.updateCriterion();// Important
-				globalCrit += nInt.crit;		
+				globalCrits[att] += nInt.crit;		
 				intervals.put(valueAnt, nInt);
 				lastInterval = new Interval(labelsToUse[att].poll(), val, clas);
 			} else {
@@ -462,6 +459,7 @@ public class REBdiscretize extends MOADiscretize {
 	  m_CutPoints = new double[numAttributes][];
 	  m_Labels = new String[numAttributes][];
 	  labelsToUse = new Queue[numAttributes];
+	  globalCrits = new float[numAttributes];
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 		  labelsToUse[i] = new LinkedList<Integer>();
@@ -481,7 +479,7 @@ public class REBdiscretize extends MOADiscretize {
 		float end;
 		int [] cd;
 		LinkedList<Float> oldPoints; // Implemented as an evicted stack
-		Multimap<Float, Integer> histogram;
+		TreeMap<Float, int[]> histogram;
 		float crit;
 		
 		public Interval() {
@@ -501,11 +499,25 @@ public class REBdiscretize extends MOADiscretize {
 			label = _label;
 			end = _end;
 			oldPoints = new LinkedList<Float>();
-			histogram = TreeMultimap.create();
-			histogram.put(_end, _class);
+			histogram = new TreeMap<Float, int[]>();
 			cd = new int[numClasses];
 			cd[_class] = 1;
+			histogram.put(_end, cd.clone());
 			crit = Float.MIN_VALUE;
+			int s1 = 0, s2 = 0, total1 = 0, total2 = 0;
+			for (int i = 0; i < cd.length; i++) {
+				s1 += cd[i];
+			}
+			
+			for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
+				int[] v = entry.getValue();
+				for (int i = 0; i < v.length; i++) {
+					total2 += v[i];
+				}
+			}
+			if(s1 != total2)
+				System.err.println("asd");
 		}
 		
 		public Interval(Interval other) {
@@ -515,12 +527,21 @@ public class REBdiscretize extends MOADiscretize {
 			cd = other.cd.clone();
 			crit = other.crit;
 			oldPoints = new LinkedList<Float>(other.oldPoints);
-			histogram = TreeMultimap.create();
+			histogram = new TreeMap<Float, int[]>();
 			histogram.putAll(other.histogram);
 		}
 		
 		public void addPoint(float value, int cls){
-			histogram.put(value, cls);
+			if(value == 0.041161f && cls == 1)
+				System.err.println("asd");
+			int[] pd = histogram.get(value);
+			if(pd != null) {
+				pd[cls]++;
+			} else {
+				pd = new int[cd.length];
+				pd[cls]++;
+				histogram.put(value, pd);
+			}
 			// Update values
 			cd[cls]++;
 			if(value > end) 
@@ -528,13 +549,32 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 		public void removePoint(float value, int cls) {
-			histogram.remove(value, cls);
-			cd[cls]--;
+			int[] pd = histogram.get(value);
+			if(pd != null) {
+				if(pd[cls] > 0) {
+					pd[cls]--;
+					cd[cls]--;
+				}
+				boolean delete = true;
+				// If all values are equal to zero, remove the point from the map
+				for (int i = 0; i < pd.length; i++) {
+					if(pd[cls] == 0){
+						delete = false;
+						break;
+					}						
+				}
+				if(delete) histogram.remove(value);
+			} else {
+				// Error, no point in this range.
+				if(value == 0.041161)
+					System.err.println("asd");
+				System.err.println("Point not found in the given range.");
+			}
+			// Find a new maximum if the point removed is the maximum
 			if(value == end) {
-				NavigableSet<Float> keyset = (NavigableSet<Float>) histogram.keySet();
-				Float nend = keyset.floor(value); // get the new maximum
-				if(nend != null)
-					end = nend;
+				Float newend = histogram.floorKey(value); // get the new maximum
+				if(newend != null)
+					end = newend;
 			}
 		}
 		
@@ -546,19 +586,22 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 		public Interval splitInterval(int att, float value) {
-			TreeMultimap<Float, Integer> nHist = TreeMultimap.create();
+			TreeMap<Float, int[]> nHist = new TreeMap<Float, int[]>();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
-			for (Iterator iterator = histogram.entries().iterator(); iterator.hasNext();) {
-				Entry<Float, Integer> entry = (Entry) iterator.next();
+			for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
 				if(entry.getKey() > value){
 					//histogram.entries().remove(entry);
 					nHist.put(entry.getKey(), entry.getValue());
-					nCd[entry.getValue()]++;
-					cd[entry.getValue()]--;
+					for(int i = 0; i < entry.getValue().length; i++){
+						nCd[i] += entry.getValue()[i];
+						cd[i] -= entry.getValue()[i];
+					}					
 					iterator.remove();
 				}				
 			}
+			
 			if(nHist.isEmpty())
 				return null;
 			// Split old points
@@ -571,8 +614,14 @@ public class REBdiscretize extends MOADiscretize {
 			}
 			
 			/** New interval (which lays at the right of the cut point) **/
+			int s1 = 0, s2 = 0;
+			for (int i = 0; i < nCd.length; i++) {
+				s1 += cd[i];
+				s2 += nCd[i];
+			}
+			
 			Interval nInterval = new Interval();
-			if(histogram.size() > nHist.size()){
+			if(s1 > s2){
 				nInterval.label = labelsToUse[att].poll();
 			} else {
 				nInterval.label = this.label;
@@ -591,13 +640,34 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 		public int mergeIntervals(Interval interv2){
+			
+			
+
 			// The interval with less elements lose its label
 			//label = (this.label > interv2.label) ? this.label : interv2.label;
+			int s1 = 0, s2 = 0, total1 = 0, total2 = 0;
+			for (int i = 0; i < cd.length; i++) {
+				s1 += cd[i];
+				s2 += interv2.cd[i];
+			}
+			
+			for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
+				int[] v = entry.getValue();
+				for (int i = 0; i < v.length; i++) {
+					total2 += v[i];
+				}
+			}
+			if(s1 != total2)
+				System.err.println("asd");
+			
+			
 			int oldlab = interv2.label;
-			if(histogram.size() < interv2.histogram.size()) {
+			if(s1 < s2) {
 				oldlab = this.label;
 				this.label = interv2.label;
 			}
+			
 			float innerpoint = (this.end < interv2.end) ? this.end : interv2.end;
 			if(oldPoints.size() >= MAX_OLD)
 				oldPoints.pollFirst(); // Remove the oldest element
@@ -605,10 +675,34 @@ public class REBdiscretize extends MOADiscretize {
 			// Set the new end
 			end = (this.end > interv2.end) ? this.end : interv2.end;
 			// Merge histograms and class distributions
+			total1 = 0;
+			total2 = 0;
 			for (int i = 0; i < cd.length; i++) {
 				cd[i] += interv2.cd[i];
+				total1 += cd[i];
 			}
-			histogram.putAll(interv2.histogram);
+			
+			for (Iterator iterator = interv2.histogram.entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
+				int[] v = histogram.get(entry.getKey());
+				if(v != null) {
+					for (int i = 0; i < v.length; i++){
+						v[i] += entry.getValue()[i];
+					}
+				} else {
+					histogram.put(entry.getKey(), entry.getValue());
+				}
+			}
+			
+			for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
+				int[] v = entry.getValue();
+				for (int i = 0; i < v.length; i++) {
+					total2 += v[i];
+				}
+			}
+			if(total1 != total2)
+				System.err.println("asd");
 			updateCriterion();
 			return oldlab;
 		}

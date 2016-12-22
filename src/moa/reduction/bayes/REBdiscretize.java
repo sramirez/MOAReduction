@@ -31,7 +31,7 @@ public class REBdiscretize extends MOADiscretize {
 	boolean init = false;
 	private long seed = 317901561;
 	private float lambda, alpha, errorRate = 0.25f;
-	private static int MAX_OLD = 5;
+	private static int MAX_OLD = 5, INIT_TH = 1000;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
 	private Queue<Integer>[] labelsToUse; 
@@ -93,10 +93,30 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
-    
+
+	  Instance replacedInstance = null;
 	  if(totalCount > sample.length){
+		  if(rand.nextFloat() < errorRate + ERR_TH){
+			 int pos = isample % sample.length;
+			 replacedInstance = sample[pos];
+			 sample[pos] = instance.copy();
+		  } 
+		  isample++;
+	  } else {
+		  sample[totalCount - 1] = instance.copy();
+	  }
+    
+	  // If there are enough instances to initialize cut points, do it!
+	  if(totalCount > INIT_TH){
 		  if(init) {
-			  boolean updated = updateSampleByError(instance);
+			  for (int i = 0; i < instance.numAttributes(); i++) {
+				 // if numeric and not missing, discretize
+				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+					 insertExample(i, instance);
+					 if(replacedInstance != null)
+						 deleteExample(i, replacedInstance);
+				 }
+			  }
 		  } else {
 			  batchFusinter();
 			  for (int i = 0; i < allIntervals.length; i++) {
@@ -104,32 +124,7 @@ public class REBdiscretize extends MOADiscretize {
 			  }
 			  init = true;
 		  }
-	  } else {
-		  sample[totalCount - 1] = instance.copy();
 	  }
-  }
-  
-  private boolean updateSampleByError(Instance instance){
-	  boolean updated = false;
-	  Instance replacedInstance = null;
-	  if(rand.nextFloat() < errorRate + ERR_TH){
-		 int pos = isample % sample.length;
-		 replacedInstance = sample[pos];
-		 sample[pos] = instance.copy(); 
-		 updated = true;
-	  } 
-	  isample++;
-	  
-	  if(updated) {
-		  for (int i = 0; i < instance.numAttributes(); i++) {
-			 // if numeric and not missing, discretize
-			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-				 insertExample(i, instance);
-				 deleteExample(i, replacedInstance);
-			 }
-		  }
-	  }
-	  return updated;
   }
   
   private void checkHistogramIntervals(Interval interval){
@@ -371,16 +366,18 @@ public class REBdiscretize extends MOADiscretize {
 	  // TODO Auto-generated method stub
 	  float[][] sorted = new float[numAttributes][sample.length];
 	  final int[] classData = new int[sample.length];
-	  for (int j = 0; j < sample.length; j++) {
+	  int nvalid = 0;
+	  for (int j = 0; j < sample.length && sample[j] != null; j++) {
 		  classData[j] = (int) sample[j].classValue();
+		  nvalid++;
 	  }
 	  
 	  for (int i = numAttributes - 1; i >= 0; i--) {
 		  if ((m_DiscretizeCols.isInRange(i))
 				  && (sample[0].attribute(i).isNumeric())
 				  && (sample[0].classIndex() != i)) {
-			  Integer[] idx = new Integer[sample.length];
-			  for (int j = 0; j < sample.length; j++) {
+			  Integer[] idx = new Integer[nvalid - 1];
+			  for (int j = 0; j < idx.length; j++) {
 			  //updateLayer1(instance, i);
 				  idx[j] = j;
 				  sorted[i][j] = (float) sample[j].value(i);
@@ -389,7 +386,8 @@ public class REBdiscretize extends MOADiscretize {
 			  
 			  // Order by feature value and class
 			  Arrays.sort(idx, new Comparator<Integer>() {
-			      @Override public int compare(final Integer o1, final Integer o2) {
+			      @Override 
+			      public int compare(final Integer o1, final Integer o2) {
 			    	  int cmp_value = Float.compare(data[o1], data[o2]);
 			    	  if(cmp_value == 0) 
 			    		  cmp_value = Integer.compare(classData[o1], classData[o2]);
@@ -470,7 +468,7 @@ public class REBdiscretize extends MOADiscretize {
 		float valueAnt = (float) sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
 		Interval lastInterval =  new Interval(labelsToUse[att].poll(), valueAnt, classAnt);
-		for(int i = 1; i < sample.length;i++) {
+		for(int i = 1; i < idx.length;i++) {
 			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
 			if(val != valueAnt && clas != classAnt) {

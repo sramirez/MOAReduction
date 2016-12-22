@@ -168,8 +168,6 @@ public class REBdiscretize extends MOADiscretize {
   	 // INSERTION
      int cls = (int) instance.classValue();
 	 float val = (float) instance.value(att);
-	 if(val == 0.0f && att == 3)
-		 System.err.println("asd");
 	 // Get the ceiling interval for the given value
 	 Map.Entry<Float, Interval> centralE = allIntervals[att].ceilingEntry(val);
 	 // The point is within the range defined by centralE, if not a new maximum interval is created
@@ -220,8 +218,6 @@ public class REBdiscretize extends MOADiscretize {
   private void deleteExample(int att, Instance instance) {
 	 int cls = (int) instance.classValue();
 	 float val = (float) instance.value(att);
-	 if(val == 0.0f && att == 3)
-		 System.err.println("asd");
 	 // Find the interval containing the point to be removed
 	 Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(val);
 	 if(ceilingE != null){ // The point must be contained in any previously inserted interval
@@ -283,11 +279,9 @@ public class REBdiscretize extends MOADiscretize {
   
   private void checkUnfoundPoint(int att, float value) {
 	  boolean found = false;
-	  Interval interv = null;
 	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); iterator.hasNext();) {
 			Interval interval = iterator.next();
 			if(interval.histogram.containsKey(value)){
-				interv = interval;
 				found = true;
 			}	
 	  }
@@ -315,21 +309,54 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private boolean isBoundary(int att, Interval ceiling, float value, int clas){
-	  Entry<Float, int[]> lower = ceiling.histogram.lowerEntry(value);
-	  // The new greatest point in the attribute
-	  if(lower == null) {
-		  Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(ceiling.end);
-		  if(lowerE == null)
+	  Entry<Float, int[]> following = ceiling.histogram.ceilingEntry(value);
+	  boolean boundary = false;
+	  // The previous point is in another interval (interval with a single point)
+	  if(following == null) {		  
+		  Entry<Float, Interval> higherE = allIntervals[att].higherEntry(ceiling.end);
+		  if(higherE == null) {
+			  boundary = true; // no more points at the right side
+		  } else {
+			  following = higherE.getValue().histogram.ceilingEntry(value);
+			  int[] cd1 = following.getValue();		
+			  int[] cd2 = new int[cd1.length];
+			  cd2[clas]++;
+			  boundary = isBoundary(cd1, cd2);
+		  }
 	  } else {
-		  if((clas - 1) % lower.getValue().length)
+		  // If the point already exists before, evaluate if it is now a boundary
+		  if(following.getKey() == value) {
+			  Entry<Float, int[]> nextnext = ceiling.histogram.higherEntry(value);
+			  if(nextnext != null) {
+				  int[] cd1 = following.getValue();				  
+				  cd1[clas]++;
+				  boundary = isBoundary(cd1, nextnext.getValue());
+				  cd1[clas]--;
+			  } else {
+				  // Last point in the interval, it does not make sense to split
+				  boundary = false;
+			  }
+		  } else {
+			  int[] cd1 = following.getValue();		
+			  int[] cd2 = new int[cd1.length];
+			  cd2[clas]++;
+			  boundary = isBoundary(cd1, cd2);
+		  }
 	  }
-		  /*return true;
-	  if(greater.getKey() == value) 
-		  return false;
-	  if(greater.getValue()[clas] > 0)
-		  return false;*/
-	  return true;
+	  return boundary;
 	 
+  }
+  
+  private boolean isBoundary(int[] cd1, int[] cd2){
+	  int count = 0;
+	  for (int i = 0; i < cd1.length; i++) {
+		  if(cd1[i] + cd2[i] != 0) {
+			  if(++count > 1) {
+				  return true;
+			  }						  
+		  }
+	  }
+	  return false;
   }
   
   private void printIntervals(int att, Collection<Interval> intervals){
@@ -392,7 +419,8 @@ public class REBdiscretize extends MOADiscretize {
 		int posMin = 0;
 		for(int i = 0; i < intervalList.size() - 1; i++) {
 			float newLocalCrit = evaluteMerge(intervalList.get(i).cd, intervalList.get(i+1).cd);
-			float newGlobalCrit = globalCrits[att] - intervalList.get(i).crit - intervalList.get(i+1).crit + newLocalCrit;
+			float newGlobalCrit = globalCrits[att] - intervalList.get(i).crit - intervalList.get(i+1).crit
+					+ newLocalCrit;
 			float difference = globalCrits[att] - newGlobalCrit;
 			if(difference > globalDiff){
 				posMin = i;
@@ -551,7 +579,7 @@ public class REBdiscretize extends MOADiscretize {
 					pd[cls]--;
 					cd[cls]--;
 				} else {
-					System.err.println("asd");
+					System.err.println("Bad histogram.");
 				}
 				boolean delete = true;
 				// If all values are equal to zero, remove the point from the map

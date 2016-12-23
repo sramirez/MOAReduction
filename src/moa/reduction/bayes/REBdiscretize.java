@@ -31,7 +31,7 @@ public class REBdiscretize extends MOADiscretize {
 	boolean init = false;
 	private long seed = 317901561;
 	private float lambda, alpha, errorRate = 0.25f;
-	private static int MAX_OLD = 5, INIT_TH = 1000;
+	private static int MAX_OLD = 5, INIT_TH = 4137;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
 	private Queue<Integer>[] labelsToUse; 
@@ -43,7 +43,7 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		int sampleSize = 1000;
+		int sampleSize = 4137;
 		this.sample = new Instance[sampleSize];
 	}
 	
@@ -107,7 +107,7 @@ public class REBdiscretize extends MOADiscretize {
 	  }
     
 	  // If there are enough instances to initialize cut points, do it!
-	  if(totalCount > INIT_TH){
+	  if(totalCount >= INIT_TH){
 		  if(init) {
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
@@ -345,7 +345,7 @@ public class REBdiscretize extends MOADiscretize {
   private boolean isBoundary(int[] cd1, int[] cd2){
 	  int count = 0;
 	  for (int i = 0; i < cd1.length; i++) {
-		  if(cd1[i] + cd2[i] != 0) {
+		  if(cd1[i] + cd2[i] > 0) {
 			  if(++count > 1) {
 				  return true;
 			  }						  
@@ -356,9 +356,13 @@ public class REBdiscretize extends MOADiscretize {
   
   private void printIntervals(int att, Collection<Interval> intervals){
 	  System.out.println("Atributo: " + att);
+	  int sum = 0;
 	  for (Iterator<Interval> iterator = intervals.iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
-		System.out.println(interval.label + "-" + interval.end + ",");
+		for (int i = 0; i < interval.cd.length; i++) {
+			sum += interval.cd[i];
+		}
+		System.out.println(interval.label + "-" + interval.end + "," + sum);
 	  }	  
   }
   
@@ -376,9 +380,8 @@ public class REBdiscretize extends MOADiscretize {
 		  if ((m_DiscretizeCols.isInRange(i))
 				  && (sample[0].attribute(i).isNumeric())
 				  && (sample[0].classIndex() != i)) {
-			  Integer[] idx = new Integer[nvalid - 1];
+			  Integer[] idx = new Integer[nvalid];
 			  for (int j = 0; j < idx.length; j++) {
-			  //updateLayer1(instance, i);
 				  idx[j] = j;
 				  sorted[i][j] = (float) sample[j].value(i);
 			  }
@@ -464,29 +467,45 @@ public class REBdiscretize extends MOADiscretize {
 	}
   
   private TreeMap <Float, Interval> initIntervals(int att, Integer[] idx) {
-		TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
+		
+	  	TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
+		LinkedList<Tuple<Float, int[]>> distinctPoints = new LinkedList<Tuple<Float, int[]>>();
 		float valueAnt = (float) sample[idx[0]].value(att);
 		int classAnt = (int) sample[idx[0]].classValue();
-		Interval lastInterval =  new Interval(labelsToUse[att].poll(), valueAnt, classAnt);
+		int[] cd = new int[numClasses];
+		cd[classAnt]++;
+		
 		for(int i = 1; i < idx.length;i++) {
 			float val = (float) sample[idx[i]].value(att);
 			int clas = (int) sample[idx[i]].classValue();
-			if(val != valueAnt && clas != classAnt) {
-				Interval nInt = new Interval(lastInterval);
-				nInt.updateCriterion();// Important
-				globalCrits[att] += nInt.crit;		
-				intervals.put(valueAnt, nInt);
-				lastInterval = new Interval(labelsToUse[att].poll(), val, clas);
+			if(val == valueAnt) {
+				cd[clas]++;
 			} else {
-				lastInterval.addPoint(val, clas);
+				distinctPoints.add(new Tuple<Float, int[]>(valueAnt, cd));
+				cd = new int[numClasses];
+				cd[clas]++;
+				valueAnt = val;
 			}
-			valueAnt = val;
-			classAnt = clas;
+			
+		}		
+		distinctPoints.add(new Tuple<Float, int[]>(valueAnt, cd));
+		
+		Interval interval = new Interval(labelsToUse[att].poll());
+		Tuple<Float, int[]> t1 = distinctPoints.get(0);
+		interval.addPoint(t1);
+		
+		for (int i = 1; i < distinctPoints.size(); i++) {
+			Tuple<Float, int[]> t2 = distinctPoints.get(i);
+			if(isBoundary(t1.y, t2.y)){
+				intervals.put(t1.x, interval);
+				interval = new Interval(labelsToUse[att].poll());	
+			}
+			interval.addPoint(t2);
+			t1 = t2;
 		}
-		intervals.put(valueAnt, lastInterval);
+		intervals.put(t1.x, interval);		
 		return intervals;
 	}
-  
   
   private void initializeLayers(Instance inst) {
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
@@ -521,6 +540,16 @@ public class REBdiscretize extends MOADiscretize {
 		
 		public Interval() {
 			// TODO Auto-generated constructor stub
+		}
+		
+		public Interval(int _label) {
+			label = _label;
+			end = -1;
+			oldPoints = new LinkedList<Float>();
+			histogram = new TreeMap<Float, int[]>();
+			cd = new int[numClasses];
+			//histogram.put(_end, cd.clone());
+			crit = Float.MIN_VALUE;
 		}
 		
 		/**
@@ -567,6 +596,29 @@ public class REBdiscretize extends MOADiscretize {
 			cd[cls]++;
 			if(value > end) 
 				end = value;
+		}
+		
+		public void addPoint(float value, int cd[]){
+			int[] prevd = histogram.get(value);
+			if(prevd == null) {
+				prevd = new int[numClasses];
+			} else {
+				for (int i = 0; i < cd.length; i++) {
+					prevd[i] += cd[i];
+				}
+			}
+			histogram.put(value, prevd);
+			
+			for (int i = 0; i < cd.length; i++) {
+				this.cd[i] += cd[i];
+			}
+			
+			if(value > end) 
+				end = value;
+		}
+		
+		public void addPoint(Tuple<Float, int[]> point){
+			addPoint(point.x, point.y);
 		}
 		
 		public void removePoint(int att, float value, int cls) {
@@ -699,7 +751,9 @@ public class REBdiscretize extends MOADiscretize {
 			oldPoints.add(innerpoint);
 			
 			// Set the new end
-			end = (this.end > interv2.end) ? this.end : interv2.end;
+			//end = (this.end > interv2.end) ? this.end : interv2.end;
+			end = (interv2.end + end) / 2.0f;
+			
 			// Merge histograms and class distributions
 			for (int i = 0; i < cd.length; i++) {
 				cd[i] += interv2.cd[i];
@@ -723,6 +777,10 @@ public class REBdiscretize extends MOADiscretize {
 			return oldlab;
 		}
 		
+		public void setEnd(float end) {
+			this.end = end;
+		}
+		
 		public void setCrit(float crit) {
 			this.crit = crit;
 		}
@@ -732,5 +790,14 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 	}
+	
+	public class Tuple<X, Y> { 
+		  public final X x; 
+		  public final Y y; 
+		  public Tuple(X x, Y y) { 
+		    this.x = x; 
+		    this.y = y; 
+		  } 
+		} 
 
 }

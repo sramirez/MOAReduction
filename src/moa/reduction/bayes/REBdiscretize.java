@@ -31,7 +31,7 @@ public class REBdiscretize extends MOADiscretize {
 	boolean init = false;
 	private long seed = 317901561;
 	private float lambda, alpha, errorRate = 0.25f;
-	private static int MAX_OLD = 5, INIT_TH = 1000;
+	private static int MAX_OLD = 5, INIT_TH = 100;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
 	private Queue<Integer>[] labelsToUse; 
@@ -43,7 +43,7 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		int sampleSize = 1000;
+		int sampleSize = 2000;
 		this.sample = new Instance[sampleSize];
 	}
 	
@@ -64,13 +64,13 @@ public class REBdiscretize extends MOADiscretize {
 					 double[] boundaries = new double[allIntervals[i].size()];
 					 String[] labels = new String[allIntervals[i].size()];
 					 int j = 0;
-					 Set<Integer> labels2 = new HashSet<Integer>();
+					 //Set<Integer> labels2 = new HashSet<Integer>();
 				 	for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
 				 			.hasNext();) {
 				 		Interval interv = iterator.next();
 				 		labels[j] = Integer.toString(interv.label);
 				 		boundaries[j++] = interv.end;
-						labels2.add(interv.label);
+						//labels2.add(interv.label);
 
 				 	}
 				 	m_Labels[i] = labels;
@@ -109,12 +109,38 @@ public class REBdiscretize extends MOADiscretize {
 	  // If there are enough instances to initialize cut points, do it!
 	  if(totalCount > INIT_TH){
 		  if(init) {
+			  if(totalCount == 2330 || totalCount == 8833){
+				  System.err.println("asd");
+			  }
+			  System.out.println("Instancia: " + totalCount);
+			  int nint = 0;
+			  for (int j = 0; j < allIntervals.length; j++) {
+					 nint += allIntervals[j].size() + 1;
+				 }
+			  System.out.println("Number of intervals: " + nint);
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+					 if(totalCount == 2330 && i == 4){
+						  System.err.println("asd");
+					  }
 					 insertExample(i, instance);
+					 nint = 0;
+					 for (int j = 0; j < allIntervals.length; j++) {
+						 nint += allIntervals[j].size() + 1;
+					 }
+					 System.out.println("Number of intervals: " + nint);
+					 checkGlobalCriterions();
+					 if(totalCount == 2048)
+						 System.err.println("asd");
 					 if(replacedInstance != null)
 						 deleteExample(i, replacedInstance);
+					 nint = 0;
+					 for (int j = 0; j < allIntervals.length; j++) {
+						 nint += allIntervals[j].size() + 1;
+					 }
+					 System.out.println("Number of intervals (after removed): " + nint);
+					 checkGlobalCriterions();
 				 }
 			  }
 		  } else {
@@ -126,6 +152,13 @@ public class REBdiscretize extends MOADiscretize {
 		  }
 	  }
   }
+  
+  private void checkGlobalCriterions(){
+		for (int i = 0; i < globalCrits.length; i++) {
+			if(globalCrits[i] == Float.NEGATIVE_INFINITY || globalCrits[i] == Float.POSITIVE_INFINITY)
+				System.err.println("Infinity criterion");
+		}
+}
   
   private void checkHistogramIntervals(Interval interval){
 	  	int s1 = 0, total1 = 0;
@@ -190,7 +223,10 @@ public class REBdiscretize extends MOADiscretize {
 				  intervalList.add(higherE.getValue());
 				  allIntervals[att].remove(higherE.getKey());
 			  }
+			  int bfsize = intervalList.size();
 			  evaluateLocalMerges(att, intervalList);
+			  if(bfsize <= intervalList.size())
+				  System.err.println("asd");
 			  insertIntervals(att, intervalList);
 		 } else {
 			 // If not, just add the point to the interval
@@ -205,8 +241,18 @@ public class REBdiscretize extends MOADiscretize {
 	 } else {
 		 // New interval with a new maximum limit
 		 Map.Entry<Float, Interval> priorE = allIntervals[att].lowerEntry(val);
+		  LinkedList<Interval> intervalList = new LinkedList<Interval>();
+		 // Insert in the specific order
+		 if(priorE != null) {
+			 intervalList.add(priorE.getValue());
+			 allIntervals[att].remove(priorE.getKey());
+		 }
+		 
 		 Interval nInt = new Interval(labelsToUse[att].poll(), val, cls);
-		 allIntervals[att].put(val, nInt);
+		 intervalList.add(nInt);
+		 evaluateLocalMerges(att, intervalList);
+		 insertIntervals(att, intervalList);
+		 //allIntervals[att].put(val, nInt);
 	 }
   }
   

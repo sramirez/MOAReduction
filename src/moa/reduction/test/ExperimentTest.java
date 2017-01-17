@@ -31,7 +31,8 @@ public class ExperimentTest {
                 
                 //RandomRBFGenerator stream = new RandomRBFGenerator();
                 //ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/spambase.arff", -1);
-        		ArffFileStream stream = new ArffFileStream("/home/sramirez/TEST_FUSINTER/datasets/spambase/spambase-10-1tra-weka.dat", -1);
+        		//ArffFileStream stream = new ArffFileStream("/home/sramirez/TEST_FUSINTER/datasets/spambase/spambase-10-1tra-weka.dat", -1);
+        		ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/elecNormNew.arff", -1);
         		
         		//stream.numAttsOption.setValue(1000);
                 stream.prepareForUse();

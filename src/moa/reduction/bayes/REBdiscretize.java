@@ -196,6 +196,31 @@ public class REBdiscretize extends MOADiscretize {
 	 }
   }
   
+  private float lowConfidenceTh(Collection<Interval> intervals, float mult) {
+	  
+	  int n = intervals.size();
+	  float lowth = Float.POSITIVE_INFINITY;
+	  if(n > 1) {
+
+		  float[] v = new float[n];
+		  float avg = 0, sd = 0;
+		  int i = 0;
+		  for (Iterator<Interval> iterator = intervals.iterator(); 
+				  iterator.hasNext();) {
+		 		Interval interv = iterator.next();
+		 		avg += interv.crit;
+		 		v[i++] = interv.crit;
+		  }
+		  avg /= n;
+		  for (int j = 0; j < v.length; j++) {
+			  sd += Math.pow(v[j] - avg, 2);
+		  }
+		  sd = (float) Math.sqrt(sd) / n;	  
+		  lowth = avg - mult * sd;  
+	  }
+	  return lowth;
+  }
+  
   private void insertExample(int att, Instance instance){
   	 // INSERTION
      int cls = (int) instance.classValue();
@@ -466,20 +491,28 @@ public class REBdiscretize extends MOADiscretize {
   
   private void evaluateLocalMerges(int att, List<Interval> intervalList) {
 	
+	boolean batch = intervalList.size() == allIntervals[att].size();
+	float lowth = Float.POSITIVE_INFINITY;
+	if(!batch)
+		lowth = lowConfidenceTh(allIntervals[att].values(), 0f);  
+	int nmerges = 0;
+	
 	while(intervalList.size() > 1) {
 		float globalDiff = 0;
-		float maxGlobalCrit = 0;
 		int posMin = 0;
 		for(int i = 0; i < intervalList.size() - 1; i++) {
 			float newLocalCrit = evaluteMerge(intervalList.get(i).cd, intervalList.get(i+1).cd);
-			/*float newGlobalCrit = globalCrits[att] - intervalList.get(i).crit - intervalList.get(i+1).crit
-					+ newLocalCrit;
-			float difference = globalCrits[att] - newGlobalCrit;*/
 			float difference = intervalList.get(i).crit + intervalList.get(i+1).crit - newLocalCrit;
-			if(difference > globalDiff){
+			
+			//if(difference > globalDiff && (newLocalCrit < lowth || nmerges < 1)){
+			boolean condition = difference > globalDiff;
+			boolean condition2 = true;
+			if(nmerges > 0) {
+				condition = difference > (intervalList.get(i).crit + intervalList.get(i+1).crit) / 2;
+			}
+			if(condition && condition2) {
 				posMin = i;
 				globalDiff = difference;
-				//maxGlobalCrit = newGlobalCrit;
 			}
 		}
 	
@@ -489,6 +522,7 @@ public class REBdiscretize extends MOADiscretize {
 			Interval int2 = intervalList.remove(posMin+1);
 			int oldlab = int1.mergeIntervals(int2);
 			labelsToUse[att].add(oldlab);
+			nmerges++;
 		} else {
 			break;
 		}
@@ -726,7 +760,6 @@ public class REBdiscretize extends MOADiscretize {
 		public Interval splitInterval(int att, float value) {
 			
 			//checkHistogramIntervals(this);
-			
 			TreeMap<Float, int[]> nHist = new TreeMap<Float, int[]>();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();

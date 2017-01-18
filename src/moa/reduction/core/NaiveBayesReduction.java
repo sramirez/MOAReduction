@@ -283,7 +283,8 @@ public class NaiveBayesReduction extends AbstractClassifier {
 	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
 	                AttributeClassObserver obs = attributeObservers.get(attIndex);
 	                if ((obs != null) && !sinst.isMissing(instAttIndex)) {
-	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(sinst.value(instAttIndex), classIndex);
+	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(
+	                			sinst.value(instAttIndex), classIndex);
 	                }
             	}
             }

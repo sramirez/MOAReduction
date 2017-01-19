@@ -442,7 +442,7 @@ public abstract class MOADiscretize extends Filter {
 	 */
 	protected Instance convertInstance(Instance instance) {
 		int index = 0;
-	    m_DiscretizeCols.setUpper(instance.dataset().numAttributes() - 1); // Important
+	    m_DiscretizeCols.setUpper(instance.dataset().numAttributes() - 1); // Important (class is removed from discretization)
 	    double[] vals = new double[instance.numAttributes()];
 	    // Copy and convert the values
 	    for (int i = 0; i < instance.numAttributes(); i++) {

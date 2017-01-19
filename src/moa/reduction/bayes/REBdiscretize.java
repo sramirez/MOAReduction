@@ -1,5 +1,8 @@
 package moa.reduction.bayes;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -128,12 +131,14 @@ public class REBdiscretize extends MOADiscretize {
 					 checkLabelIntervals();*/
 					 //checkIntervalCriterions();
 				 }
-			  }
+			  }			  
 		  } else {
 			  batchFusinter();
 			  init = true;
 		  }
 	  }
+	  if(totalCount % 101 == 0) 
+		  writeToFilePartial(3, 4, totalCount);
   }
   
   private void checkIntervalCriterions(){
@@ -321,6 +326,60 @@ public class REBdiscretize extends MOADiscretize {
 		 evaluateLocalMerges(att, intervalList);		
 		 insertIntervals(att, intervalList);
 	 }
+  }
+  
+  private void writeToFilePartial(int att1, int att2, int iteration){
+	  FileWriter data = null;
+	  FileWriter cpoints1 = null;
+	  FileWriter cpoints2 = null;
+		try {
+			data = new FileWriter("Reb-data" + "-" + iteration + ".dat");
+			cpoints1 = new FileWriter("Reb-cpoints1" + "-" + iteration + ".dat");
+			cpoints2 = new FileWriter("Reb-cpoints2" + "-" + iteration + ".dat");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	  PrintWriter dataout = new PrintWriter(data);
+	  PrintWriter cpout1 = new PrintWriter(cpoints1);
+	  PrintWriter cpout2 = new PrintWriter(cpoints2);
+	  
+	  for (int i = 0; i < sample.length && sample[i] != null; i++) {
+		  dataout.print(sample[i].value(att1) + "," + 
+				  sample[i].value(att2) + "," + sample[i].classValue() + "\n");
+	  }
+	  
+	  if(m_CutPoints != null && m_CutPoints[att1] != null) {
+		  for (int i = 0; i < m_CutPoints[att1].length; i++) {
+			  cpout1.println(m_CutPoints[att1][i]);
+		  }
+	  }
+	  
+	  if(m_CutPoints != null && m_CutPoints[att2] != null) {
+		  for (int i = 0; i < m_CutPoints[att2].length; i++) {
+			  cpout2.println(m_CutPoints[att2][i]);
+		  }
+	  }
+	  //Flush the output to the file
+	  dataout.flush();
+	  cpout1.flush();
+	  cpout2.flush();
+	       
+	   //Close the Print Writer
+	  dataout.close();
+	  cpout1.close();
+	  cpout2.close();
+	       
+	   //Close the File Writer
+	   try {
+		data.close();
+		cpoints1.close();
+		cpoints2.close();
+	   } catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	   }    
+	  
   }
   
   private boolean checkUnfoundPoint(int att, float value) {

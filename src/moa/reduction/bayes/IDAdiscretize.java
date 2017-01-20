@@ -49,7 +49,7 @@ public class IDAdiscretize extends MOADiscretize {
 	protected IntervalHeap[] sReservoirs;
 	
 
-	private LinkedList<Integer> labels = new LinkedList<Integer>();
+	private LinkedList<Float> labels = new LinkedList<Float>();
 	
 	// type of IDA
 	protected IDAType type;
@@ -111,8 +111,8 @@ public class IDAdiscretize extends MOADiscretize {
 			updateWindowSample(inst);
 		}
 
-		  if(nbSeenInstances % 101 == 0) 
-			  writeToFilePartial(3, 4, nbSeenInstances);
+		 if(nbSeenInstances % 101 == 0) 
+			 writeCPointsToFile(1, 2, nbSeenInstances, "IDA");
 	}
 	
 	/**
@@ -131,7 +131,7 @@ public class IDAdiscretize extends MOADiscretize {
 				}
 				if(labels.size() >= sampleSize)
 					labels.poll();
-				labels.add(inst.classIndex());
+				labels.add((float) inst.classValue());
 			}
 			if(inst.attribute(i).isNumeric()) { 
 				nbNumericalAttributesCount++;
@@ -187,59 +187,4 @@ public class IDAdiscretize extends MOADiscretize {
 			sReservoirs[i] = new IntervalHeap(this.nBins, this.sampleSize, i);
 		}
 	}
-	
-	private void writeToFilePartial(int att1, int att2, int iteration){
-		  FileWriter data = null;
-		  FileWriter cpoints1 = null;
-		  FileWriter cpoints2 = null;
-			try {
-				data = new FileWriter("IDA-data" + "-" + iteration + ".dat");
-				cpoints1 = new FileWriter("IDA-cpoints1" + "-" + iteration + ".dat");
-				cpoints2 = new FileWriter("IDA-cpoints2" + "-" + iteration + ".dat");
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		  PrintWriter dataout = new PrintWriter(data);
-		  PrintWriter cpout1 = new PrintWriter(cpoints1);
-		  PrintWriter cpout2 = new PrintWriter(cpoints2);
-		  
-		  for (int i = 0; i < sReservoirs[att1].windowValues.size(); i++) {
-			  dataout.print(sReservoirs[att1].windowValues.get(i) + "," + 
-					  sReservoirs[att2].windowValues.get(i) + "," + 
-					  labels.get(i) + "\n");
-		  }
-		  
-		  if(m_CutPoints != null && m_CutPoints[att1] != null) {
-			  for (int i = 0; i < m_CutPoints[att1].length; i++) {
-				  cpout1.println(m_CutPoints[att1][i]);
-			  }
-		  }
-		  
-		  if(m_CutPoints != null && m_CutPoints[att2] != null) {
-			  for (int i = 0; i < m_CutPoints[att2].length; i++) {
-				  cpout2.println(m_CutPoints[att2][i]);
-			  }
-		  }
-		  //Flush the output to the file
-		  dataout.flush();
-		  cpout1.flush();
-		  cpout2.flush();
-		       
-		   //Close the Print Writer
-		  dataout.close();
-		  cpout1.close();
-		  cpout2.close();
-		       
-		   //Close the File Writer
-		   try {
-			data.close();
-			cpoints1.close();
-			cpoints2.close();
-		   } catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		   }    
-		  
-	  }
 }

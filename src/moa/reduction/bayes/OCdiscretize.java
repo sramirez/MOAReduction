@@ -52,7 +52,7 @@ public class OCdiscretize extends MOADiscretize{
 	private static final long serialVersionUID = 1L;
 
   /** The number of bins to divide the attribute into */
-  protected float totalCount;
+  protected int totalCount;
   
   protected ArrayList<TreeMap<Double, Bin>> trees;  
   protected List<LinkedList<Double>> it_bin;
@@ -124,6 +124,10 @@ public class OCdiscretize extends MOADiscretize{
 			  	}  
 		  }
 	  }
+	  
+
+	 if(totalCount % 101 == 0) 
+		 writeCPointsToFile(1, 2, totalCount, "OC");
   }
 
   private void initialize(Instance inst){

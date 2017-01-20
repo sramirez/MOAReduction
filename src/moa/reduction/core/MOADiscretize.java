@@ -1,5 +1,8 @@
 package moa.reduction.core;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -585,6 +588,49 @@ public abstract class MOADiscretize extends Filter {
 		}
 		return 0;
 	}
+	
+	protected void writeCPointsToFile(int att1, int att2, int iteration, String method){
+		  FileWriter cpoints1 = null;
+		  FileWriter cpoints2 = null;
+			try {
+				cpoints1 = new FileWriter(method + "-cpoints1" + "-" + iteration + ".dat");
+				cpoints2 = new FileWriter(method + "-cpoints2" + "-" + iteration + ".dat");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		  PrintWriter cpout1 = new PrintWriter(cpoints1);
+		  PrintWriter cpout2 = new PrintWriter(cpoints2);		  
+		  
+		  if(m_CutPoints != null && m_CutPoints[att1] != null) {
+			  for (int i = 0; i < m_CutPoints[att1].length; i++) {
+				  cpout1.println(m_CutPoints[att1][i]);
+			  }
+		  }
+		  
+		  if(m_CutPoints != null && m_CutPoints[att2] != null) {
+			  for (int i = 0; i < m_CutPoints[att2].length; i++) {
+				  cpout2.println(m_CutPoints[att2][i]);
+			  }
+		  }
+		  //Flush the output to the file;
+		  cpout1.flush();
+		  cpout2.flush();
+		       
+		   //Close the Print Writer
+		  cpout1.close();
+		  cpout2.close();
+		       
+		   //Close the File Writer
+		   try {
+			cpoints1.close();
+			cpoints2.close();
+		   } catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		   }    
+		  
+	  }
 
 	/**
 	 * Update the discretization model without updating 

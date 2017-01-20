@@ -45,7 +45,7 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		int sampleSize = 2000;
+		int sampleSize = 1000;
 		this.sample = new Instance[sampleSize];
 	}
 	
@@ -137,8 +137,10 @@ public class REBdiscretize extends MOADiscretize {
 			  init = true;
 		  }
 	  }
-	  if(totalCount % 101 == 0) 
-		  writeToFilePartial(3, 4, totalCount);
+	  if(totalCount % 101 == 0) {
+		  writeCPointsToFile(1, 2, totalCount, "Reb");
+		  writeDataToFile(1, 2, totalCount);
+	  }
   }
   
   private void checkIntervalCriterions(){
@@ -353,53 +355,30 @@ public class REBdiscretize extends MOADiscretize {
 	 }
   }
   
-  private void writeToFilePartial(int att1, int att2, int iteration){
+  private void writeDataToFile(int att1, int att2, int iteration){
 	  FileWriter data = null;
-	  FileWriter cpoints1 = null;
-	  FileWriter cpoints2 = null;
 		try {
 			data = new FileWriter("Reb-data" + "-" + iteration + ".dat");
-			cpoints1 = new FileWriter("Reb-cpoints1" + "-" + iteration + ".dat");
-			cpoints2 = new FileWriter("Reb-cpoints2" + "-" + iteration + ".dat");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	  PrintWriter dataout = new PrintWriter(data);
-	  PrintWriter cpout1 = new PrintWriter(cpoints1);
-	  PrintWriter cpout2 = new PrintWriter(cpoints2);
 	  
 	  for (int i = 0; i < sample.length && sample[i] != null; i++) {
 		  dataout.print(sample[i].value(att1) + "," + 
 				  sample[i].value(att2) + "," + sample[i].classValue() + "\n");
 	  }
 	  
-	  if(m_CutPoints != null && m_CutPoints[att1] != null) {
-		  for (int i = 0; i < m_CutPoints[att1].length; i++) {
-			  cpout1.println(m_CutPoints[att1][i]);
-		  }
-	  }
-	  
-	  if(m_CutPoints != null && m_CutPoints[att2] != null) {
-		  for (int i = 0; i < m_CutPoints[att2].length; i++) {
-			  cpout2.println(m_CutPoints[att2][i]);
-		  }
-	  }
 	  //Flush the output to the file
 	  dataout.flush();
-	  cpout1.flush();
-	  cpout2.flush();
 	       
 	   //Close the Print Writer
 	  dataout.close();
-	  cpout1.close();
-	  cpout2.close();
 	       
 	   //Close the File Writer
 	   try {
 		data.close();
-		cpoints1.close();
-		cpoints2.close();
 	   } catch (IOException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
@@ -564,12 +543,15 @@ public class REBdiscretize extends MOADiscretize {
 			float difference = intervalList.get(i).crit + intervalList.get(i+1).crit - newLocalCrit;
 			
 			//if(difference > globalDiff && (newLocalCrit < lowth || nmerges < 1)){
-			boolean condition = difference > globalDiff;
-			boolean condition2 = true;
+			/*boolean condition = difference > globalDiff;
 			if(nmerges > 0) {
-				condition = difference > (intervalList.get(i).crit + intervalList.get(i+1).crit) / 2;
+				condition = difference > (intervalList.get(i).crit + intervalList.get(i+1).crit) / 2.0f;
 			}
-			if(condition && condition2) {
+			if(condition) {
+				posMin = i;
+				globalDiff = difference;
+			}*/
+			if(difference > globalDiff){
 				posMin = i;
 				globalDiff = difference;
 			}
@@ -608,7 +590,7 @@ public class REBdiscretize extends MOADiscretize {
 			factor = (cd[j] + lambda) / (Nj + numClasses * lambda);
 			suma += factor * (1 - factor);
 		}
-		float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (((float) numClasses * lambda) / Nj));
+		float crit = (alpha * ((float) Nj / totalCount) * suma) + ((1 - alpha) * (numClasses * lambda / Nj));
 		return crit;
 	}
   

@@ -64,7 +64,7 @@ public class PIDdiscretize extends MOADiscretize {
 	/** Instance limit before starting the splitting process */
 	protected int initialElements = 100;
 
-  protected float totalCount = 0;
+  protected int totalCount = 0;
 
   /** Store the current cutpoints */  
   protected List<List<Double>> m_CutPointsL1 = null;
@@ -116,6 +116,9 @@ public class PIDdiscretize extends MOADiscretize {
 	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
 		  updateLayer2(instance);
 	  }
+
+	 if(totalCount % 101 == 0) 
+		 writeCPointsToFile(1, 2, totalCount, "PiD");
   }
   
   private void initializeLayers(Instance inst){

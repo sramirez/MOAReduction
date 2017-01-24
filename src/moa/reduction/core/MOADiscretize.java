@@ -3,25 +3,25 @@ package moa.reduction.core;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 
-import weka.core.Attribute;
-import weka.core.ContingencyTables;
+import moa.core.Example;
+import moa.core.FastVector;
+import moa.core.InstanceExample;
+import moa.streams.InstanceStream;
+import moa.streams.filters.AbstractStreamFilter;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import weka.core.Range;
 import weka.core.Utils;
-import weka.filters.Filter;
 
+import com.yahoo.labs.samoa.instances.Attribute;
 import com.yahoo.labs.samoa.instances.DenseInstance;
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.Instances;
-import com.yahoo.labs.samoa.instances.SamoaToWekaInstanceConverter;
+import com.yahoo.labs.samoa.instances.InstancesHeader;
 import com.yahoo.labs.samoa.instances.SparseInstance;
-import com.yahoo.labs.samoa.instances.WekaToSamoaInstanceConverter;
 
 
-public abstract class MOADiscretize extends Filter {
+public abstract class MOADiscretize extends AbstractStreamFilter {
 
 	/** for serialization */
 	static final long serialVersionUID = -3141006402280129097L;
@@ -34,60 +34,27 @@ public abstract class MOADiscretize extends Filter {
 	
 	protected String[][] m_Labels = null;
 	
-	/** Output binary attributes for discretized attributes. */
-	protected boolean m_MakeBinary = false;
-	
-	/** Use bin numbers rather than ranges for discretized attributes. */
-	protected boolean m_UseBinNumbers = false;
-	
-	/** Use better encoding of split point for MDL. */
-	protected boolean m_UseBetterEncoding = false;
-	
-	/** Use Kononenko's MDL criterion instead of Fayyad et al.'s */
-	protected boolean m_UseKononenko = false;
-	
 	/** Precision for bin range labels */
 	protected int m_BinRangePrecision = 6;
+	
+	/** new header with discretized attributes */
+	protected InstancesHeader discretizedHeader;
+	
+	// number of instances seen so far
+	protected int nbSeenInstances;
+	
+	// number of attributes
+	protected int nbAttributes;
+	
+
+	// has been init
+	protected boolean init = false;
 	
 	/** Constructor - initialises the filter */
 	public MOADiscretize() {	
 	  setAttributeIndices("first-last");
 	}
 
-
-	/**
-	 * Sets the format of the input instances.
-	 * 
-	 * @param instanceInfo an Instances object containing the input instance
-	 *          structure (any instances contained in the object are ignored -
-	 *          only the structure is required).
-	 * @return true if the outputFormat may be collected immediately
-	 * @throws Exception if the input format can't be set successfully
-	 */
-	@Override
-	public boolean setInputFormat(weka.core.Instances instanceInfo) throws Exception {
-	
-	  super.setInputFormat(instanceInfo);
-	
-	  m_DiscretizeCols.setUpper(instanceInfo.numAttributes() - 1);
-	  m_CutPoints = null;
-	
-	  // If we implement loading cutfiles, then load
-	  // them here and set the output format
-	  return false;
-	}
-
-	
-	/**
-	 * Returns the tip text for this property
-	 * 
-	 * @return tip text for this property suitable for displaying in the
-	 *         explorer/experimenter gui
-	 */
-	public String binRangePrecisionTipText() {
-	  return "The number of decimal places for cut points to use when generating bin labels";
-	}
-	
 	/**
 	 * Set the precision for bin boundaries. Only affects the boundary values used
 	 * in the labels for the converted attributes; internal cutpoints are at full
@@ -108,89 +75,6 @@ public abstract class MOADiscretize extends Filter {
 	 */
 	public int getBinRangePrecision() {
 	  return m_BinRangePrecision;
-	}
-	
-	/**
-	 * Returns the tip text for this property
-	 * 
-	 * @return tip text for this property suitable for displaying in the
-	 *         explorer/experimenter gui
-	 */
-	public String makeBinaryTipText() {
-	
-	  return "Make resulting attributes binary.";
-	}
-	
-	/**
-	 * Gets whether binary attributes should be made for discretized ones.
-	 * 
-	 * @return true if attributes will be binarized
-	 */
-	public boolean getMakeBinary() {
-	
-	  return m_MakeBinary;
-	}
-	
-	/**
-	 * Sets whether binary attributes should be made for discretized ones.
-	 * 
-	 * @param makeBinary if binary attributes are to be made
-	 */
-	public void setMakeBinary(boolean makeBinary) {
-	
-	  m_MakeBinary = makeBinary;
-	}
-	
-	/**
-	 * Returns the tip text for this property
-	 * 
-	 * @return tip text for this property suitable for displaying in the
-	 *         explorer/experimenter gui
-	 */
-	public String useBinNumbersTipText() {
-	  return "Use bin numbers (eg BXofY) rather than ranges for for discretized attributes";
-	}
-	
-	/**
-	 * Gets whether bin numbers rather than ranges should be used for discretized
-	 * attributes.
-	 * 
-	 * @return true if bin numbers should be used
-	 */
-	public boolean getUseBinNumbers() {
-	
-	  return m_UseBinNumbers;
-	}
-	
-	/**
-	 * Sets whether bin numbers rather than ranges should be used for discretized
-	 * attributes.
-	 * 
-	 * @param useBinNumbers if bin numbers should be used
-	 */
-	public void setUseBinNumbers(boolean useBinNumbers) {
-	
-	  m_UseBinNumbers = useBinNumbers;
-	}
-	
-	/**
-	 * Gets whether better encoding is to be used for MDL.
-	 * 
-	 * @return true if the better MDL encoding will be used
-	 */
-	public boolean getUseBetterEncoding() {
-	
-	  return m_UseBetterEncoding;
-	}
-	
-	/**
-	 * Sets whether better encoding is to be used for MDL.
-	 * 
-	 * @param useBetterEncoding true if better encoding to be used.
-	 */
-	public void setUseBetterEncoding(boolean useBetterEncoding) {
-	
-	  m_UseBetterEncoding = useBetterEncoding;
 	}
 	
 	/**
@@ -328,124 +212,14 @@ public abstract class MOADiscretize extends Filter {
 	      + Utils.doubleToString(cutPoints[j], precision) + "]";
 	}
 	
-	
-	
-	/**
-	 * Set the output format. Takes the currently defined cutpoints and
-	 * m_InputFormat and calls setOutputFormat(Instances) appropriately.
-	 */
-	protected weka.core.Instances changeOutputFormat(weka.core.Instances inputFormat) {
-	
-	  if (m_CutPoints == null) {
-	    //setOutputFormat(null);
-	    return null;
-	  }
-	  ArrayList<Attribute> attributes = new ArrayList<Attribute>(inputFormat.numAttributes());
-	  int classIndex = inputFormat.classIndex();
-	  for (int i = 0, m = inputFormat.numAttributes(); i < m; ++i) {
-	    if ((m_DiscretizeCols.isInRange(i))
-	      && (inputFormat.attribute(i).isNumeric())) {
-	
-	      Set<String> cutPointsCheck = new HashSet<String>();
-	      double[] cutPoints = m_CutPoints[i];
-	      if (!m_MakeBinary) {
-	        ArrayList<String> attribValues;
-	        if (cutPoints == null) {
-	          attribValues = new ArrayList<String>(1);
-	          attribValues.add("'All'");
-	        } else {
-	          attribValues = new ArrayList<String>(cutPoints.length + 1);
-	          boolean predefinedLabels = false;
-	          if(m_Labels != null) {
-	        	  if(m_Labels[i].length == m_CutPoints[i].length)
-	        		  predefinedLabels = true;
-	          }
-	          if(predefinedLabels) {
-	        	  for (int j = 0; j < m_Labels[i].length; j++) {
-		              attribValues.add(m_Labels[i][j]);
-	        	  }  
-	          } else if (m_UseBinNumbers) {
-	            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
-	              attribValues.add("'B" + (j + 1) + "of" + (n + 1) + "'");
-	            }
-	          } else {
-	            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
-	              String newBinRangeString = binRangeString(cutPoints, j,
-	                m_BinRangePrecision);
-	              if (cutPointsCheck.contains(newBinRangeString)) {
-	                throw new IllegalArgumentException(
-	                  "A duplicate bin range was detected. "
-	                    + "Try increasing the bin range precision.");
-	              }
-	              attribValues.add("'" + newBinRangeString + "'");
-	            }
-	          }
-	        }
-	        
-	        //System.out.println("Att: " + i);
-	        //System.out.println("Att values: " + attribValues);
-	        Attribute newAtt = new Attribute(
-	          inputFormat.attribute(i).name(), attribValues);
-	        newAtt.setWeight(inputFormat.attribute(i).weight());
-	        attributes.add(newAtt);
-	      } else {
-	        if (cutPoints == null) {
-	        	ArrayList<String> attribValues = new ArrayList<String>(1);
-	            attribValues.add("'All'");
-	            Attribute newAtt = new Attribute(inputFormat.attribute(i)
-	              .name(), attribValues);
-	            newAtt.setWeight(inputFormat.attribute(i).weight());
-	            attributes.add(newAtt);
-	        } else {
-	          if (i < inputFormat.classIndex()) {
-	            classIndex += cutPoints.length - 1;
-	          }
-	          for (int j = 0, n = cutPoints.length; j < n; ++j) {
-	            ArrayList<String> attribValues = new ArrayList<String>(2);
-	            if (m_UseBinNumbers) {
-	              attribValues.add("'B1of2'");
-	              attribValues.add("'B2of2'");
-	            } else {
-	              double[] binaryCutPoint = { cutPoints[j] };
-	              String newBinRangeString1 = binRangeString(binaryCutPoint, 0,
-	                m_BinRangePrecision);
-	              String newBinRangeString2 = binRangeString(binaryCutPoint, 1,
-	                m_BinRangePrecision);
-	              if (newBinRangeString1.equals(newBinRangeString2)) {
-	                throw new IllegalArgumentException(
-	                  "A duplicate bin range was detected. "
-	                    + "Try increasing the bin range precision.");
-	              }
-	              attribValues.add("'" + newBinRangeString1 + "'");
-	              attribValues.add("'" + newBinRangeString2 + "'");
-	            }
-	            Attribute newAtt = new Attribute(inputFormat.attribute(i)
-	              .name() + "_" + (j + 1), attribValues);
-	            newAtt.setWeight(inputFormat.attribute(i).weight());
-	            attributes.add(newAtt);
-	          }
-	        }
-	      }
-	    } else {
-	      attributes.add((Attribute) inputFormat.attribute(i).copy());
-	    }
-	  }
-	  
-	  weka.core.Instances outputFormat = new weka.core.Instances(inputFormat.relationName(),
-	    attributes, 0);
-	  outputFormat.setClassIndex(classIndex);
-	  return outputFormat;
-	}
-	
 	/**
 	 * Convert a single instance over. The converted instance is added to the end
 	 * of the output queue.
 	 * 
 	 * @param instance the instance to convert
 	 */
-	protected Instance convertInstance(Instance instance) {
+	protected InstanceExample discretize(Instance instance) {
 		int index = 0;
-	    m_DiscretizeCols.setUpper(instance.dataset().numAttributes() - 1); // Important (class is removed from discretization)
 	    double[] vals = new double[instance.numAttributes()];
 	    // Copy and convert the values
 	    for (int i = 0; i < instance.numAttributes(); i++) {
@@ -456,42 +230,33 @@ public abstract class MOADiscretize extends Filter {
 	        if (m_CutPoints[i] == null) {
 	          if (instance.isMissing(i)) {
 	            vals[index] = Utils.missingValue();
-	            instance.setValue(index, Utils.missingValue());
 	          } else {
 	            vals[index] = 0;
-	            instance.setValue(index, 0);
 	          }
 	          index++;
 	        } else {
-	          if (!m_MakeBinary) {
 	            if (instance.isMissing(i)) {
 	              vals[index] = Utils.missingValue();
-	              instance.setValue(index, Utils.missingValue());
 	            } else {
 	              for (j = 0; j < m_CutPoints[i].length; j++) {
 	                if (currentVal <= m_CutPoints[i][j]) {
 	                  break;
 	                }
 	              }
-	              vals[index] = j;
-	              instance.setValue(index, j);
+	              if(m_Labels != null) {
+	            	  if(m_Labels[i] != null) {
+	            		  if(j < m_Labels[i].length)
+	            			  vals[index] = Float.parseFloat(m_Labels[i][j]);
+	            		  else 
+	            			  vals[index] = Integer.MAX_VALUE;
+	            	  } else {
+	            		  vals[index] = j;
+	            	  }
+	              } else {
+	            	  vals[index] = j;
+	              }
 	            }
 	            index++;
-	          } else {
-	            for (j = 0; j < m_CutPoints[i].length; j++) {
-	              if (instance.isMissing(i)) {
-	                vals[index] = Utils.missingValue();
-	                instance.setValue(index, Utils.missingValue());
-	              } else if (currentVal <= m_CutPoints[i][j]) {
-	                vals[index] = 0;
-	                instance.setValue(index, 0);
-	              } else {
-	                vals[index] = 1;
-	                instance.setValue(index, 1);
-	              }
-	              index++;
-	            }
-	          }
 	        }
 	      } else {
 	        vals[index] = instance.value(i);
@@ -499,81 +264,17 @@ public abstract class MOADiscretize extends Filter {
 	      }
 	    }
 	    
-	    Instance outI = null;
+	    Instance discretizedInstance = null;
 	    if (instance instanceof SparseInstance) {
-	    	outI = new SparseInstance(instance.weight(), vals);
+	    	discretizedInstance = new SparseInstance(instance.weight(), vals);
 	    } else {
-	    	outI = new DenseInstance(instance.weight(), vals);
+	    	discretizedInstance = new DenseInstance(instance.weight(), vals);
 	    }
-
-	    //copyValues(inst, false, instance.dataset(), outputFormatPeek());
 	    
-	    WekaToSamoaInstanceConverter convWS = new WekaToSamoaInstanceConverter();
-	    SamoaToWekaInstanceConverter convSW = new SamoaToWekaInstanceConverter();	    
-	    Instances outS = convWS.samoaInstances(changeOutputFormat(convSW.wekaInstances(instance.dataset())));
-	    outI.setDataset(outS);
-	    return(outI);
-	}
-
-	/**
-	 * Test using Fayyad and Irani's MDL criterion.
-	 * 
-	 * @param priorCounts
-	 * @param bestCounts
-	 * @param numInstances
-	 * @param numCutPoints
-	 * @return true if the splits is acceptable
-	 */
-	protected boolean FayyadAndIranisMDL(double[] priorCounts,
-	  double[][] bestCounts, double numInstances, int numCutPoints) {
-	
-	  double priorEntropy, entropy, gain;
-	  double entropyLeft, entropyRight, delta;
-	  int numClassesTotal, numClassesRight, numClassesLeft;
-	
-	  // Compute entropy before split.
-	  priorEntropy = ContingencyTables.entropy(priorCounts);
-	
-	  // Compute entropy after split.
-	  entropy = ContingencyTables.entropyConditionedOnRows(bestCounts);
-	
-	  // Compute information gain.
-	  gain = priorEntropy - entropy;
-	
-	  // Number of classes occuring in the set
-	  numClassesTotal = 0;
-	  for (double priorCount : priorCounts) {
-	    if (priorCount > 0) {
-	      numClassesTotal++;
-	    }
-	  }
-	
-	  // Number of classes occuring in the left subset
-	  numClassesLeft = 0;
-	  for (int i = 0; i < bestCounts[0].length; i++) {
-	    if (bestCounts[0][i] > 0) {
-	      numClassesLeft++;
-	    }
-	  }
-	
-	  // Number of classes occuring in the right subset
-	  numClassesRight = 0;
-	  for (int i = 0; i < bestCounts[1].length; i++) {
-	    if (bestCounts[1][i] > 0) {
-	      numClassesRight++;
-	    }
-	  }
-	
-	  // Entropy of the left and the right subsets
-	  entropyLeft = ContingencyTables.entropy(bestCounts[0]);
-	  entropyRight = ContingencyTables.entropy(bestCounts[1]);
-	
-	  // Compute terms for MDL formula
-	  delta = Utils.log2(Math.pow(3, numClassesTotal) - 2)
-	    - ((numClassesTotal * priorEntropy) - (numClassesRight * entropyRight) - (numClassesLeft * entropyLeft));
-	
-	  // Check if split is to be accepted
-	  return (gain > (Utils.log2(numCutPoints) + delta) / numInstances);
+	    generateNewHeader();
+	    discretizedInstance.setDataset(discretizedHeader);
+		 
+	    return new InstanceExample(discretizedInstance);
 	}
 	
 	public int getNumberIntervals() {
@@ -588,6 +289,102 @@ public abstract class MOADiscretize extends Filter {
 		}
 		return 0;
 	}
+	
+	@Override
+	public InstancesHeader getHeader() {
+		return this.discretizedHeader;
+	}
+
+	@Override
+	public void getDescription(StringBuilder sb, int indent) {
+		throw new NotImplementedException();
+	}
+
+	@Override
+	protected void restartImpl() {
+		this.init = false;
+	}
+	
+	/**
+	 * Init the stream
+	 */
+	public void init() {
+		// minus one for the class
+		this.nbAttributes = inputStream.getHeader().numAttributes() - 1;
+		this.m_DiscretizeCols.setUpper(nbAttributes - 1); // Important (class is removed from discretization)
+		//generateNewHeader();
+		this.init = true;
+	}
+
+	@Override
+	public InstanceExample nextInstance() {
+		if(!init) {
+			init();
+		}
+		// one more seen instance
+		nbSeenInstances++;
+		
+		Example oldEx = this.inputStream.nextInstance();
+		InstanceExample discretizedInstance = (InstanceExample) oldEx.copy();
+		Instance inst = discretizedInstance.getData();
+		if(m_CutPoints != null)
+			discretizedInstance = discretize(inst);
+		
+		// We update the model with the prior instance
+		updateEvaluator(inst);
+		 
+		return discretizedInstance;
+	}
+	
+	protected void generateNewHeader() {
+		InstancesHeader streamHeader = this.inputStream.getHeader();
+		int nbAttributes = streamHeader.numAttributes();
+		FastVector attributes = new FastVector();
+		for (int i = 0; i < nbAttributes; i++) {
+			com.yahoo.labs.samoa.instances.Attribute attr = streamHeader.attribute(i);
+			// create a new categorical attribute
+			if (attr.isNumeric() && m_DiscretizeCols.isInRange(i)) {
+				//Set<String> cutPointsCheck = new HashSet<String>();
+		      	double[] cutPoints = m_CutPoints[i];
+		      	FastVector newAttrLabels = new FastVector();
+		        if (cutPoints == null) {
+		          newAttrLabels.add("'All'");
+		        } else {
+		          boolean predefinedLabels = false;
+		          if(m_Labels != null) {
+		        	  if(m_Labels[i].length == m_CutPoints[i].length)
+		        		  predefinedLabels = true;
+		          }
+		          if(predefinedLabels) {
+		        	  for (int j = 0; j < m_Labels[i].length; j++) {
+			              newAttrLabels.add(m_Labels[i][j]);
+		        	  }  
+		          } else {
+		            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
+		              String newBinRangeString = binRangeString(cutPoints, j,
+		                m_BinRangePrecision);
+		              /*if (cutPointsCheck.contains(newBinRangeString)) {
+		                throw new IllegalArgumentException(
+		                  "A duplicate bin range was detected. "
+		                    + "Try increasing the bin range precision.");
+		              }*/
+		              newAttrLabels.add("'" + newBinRangeString + "'");
+		            }
+		          }
+		        }
+
+				attributes.addElement(new Attribute(attr.name(), newAttrLabels));
+
+			} else {
+				attributes.addElement(attr);
+			}
+		}
+		discretizedHeader = new InstancesHeader(new Instances(getCLICreationString(InstanceStream.class), attributes, 0));
+		// TODO better handle class attribute
+		discretizedHeader.setClassIndex(discretizedHeader.numAttributes() - 1);
+	}
+	
+
 	
 	protected void writeCPointsToFile(int att1, int att2, int iteration, String method){
 		  FileWriter cpoints1 = null;
@@ -631,12 +428,12 @@ public abstract class MOADiscretize extends Filter {
 		   }    
 		  
 	  }
+	
 
 	/**
 	 * Update the discretization model without updating 
 	 * @param inst
 	 */
 	public abstract void updateEvaluator(Instance inst);
-	public abstract Instance applyDiscretization(Instance inst);
 
 }

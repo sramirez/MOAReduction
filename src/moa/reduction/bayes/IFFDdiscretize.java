@@ -125,16 +125,6 @@ public class IFFDdiscretize extends MOADiscretize {
         }        
     }
     
-    /**
-     * Apply to the instance the discretization scheme derived from previous updates.
-     *  
-     * @param instance instance to discretize
-     */
-    public Instance applyDiscretization(Instance inst) {
-    	if(m_CutPoints != null)
-    		return convertInstance(inst);
-    	return inst;
-    }
 
     /**
      * Update the discretization scheme using the new instance. 
@@ -184,23 +174,19 @@ public class IFFDdiscretize extends MOADiscretize {
                         splitInterval(index, 0);
                     }
                     
-                } else {
-                    if(!m_MakeBinary) {
-                        
-                        if (instance.isMissing(index)) {
-                            //vals[index] = Instance.missingValue();
-                        } else {
-                            for ( j = 0; j < m_CutPoints[index].length; j++) {
-                                if (currentVal <= m_CutPoints[index][j]) {
-                                    break;
-                                }
+                } else {                        
+                    if (instance.isMissing(index)) {
+                        //vals[index] = Instance.missingValue();
+                    } else {
+                        for ( j = 0; j < m_CutPoints[index].length; j++) {
+                            if (currentVal <= m_CutPoints[index][j]) {
+                                break;
                             }
-                            if(m_IntervalFrequency[index][j]<maxBinSize)
-                                m_IntervalFrequency[index][j]++;
-                            else
-                                splitInterval(index, j);
                         }
-                        
+                        if(m_IntervalFrequency[index][j]<maxBinSize)
+                            m_IntervalFrequency[index][j]++;
+                        else
+                            splitInterval(index, j);
                     }
                 }
             }

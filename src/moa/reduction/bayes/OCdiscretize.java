@@ -89,13 +89,6 @@ public class OCdiscretize extends MOADiscretize{
 	  this(numClasses);
 	  this.initialElements = initial;
   }
-
-  
-  public Instance applyDiscretization(Instance inst) {
-	  if(created)
-		  return convertInstance(inst);
-	  return inst;
-  } 
   
   public void updateEvaluator(Instance instance) {
 	  

@@ -83,22 +83,6 @@ public class IDAdiscretize extends MOADiscretize {
 	}
 	
 	@Override
-	public Instance applyDiscretization(Instance inst) {
-		  
-		  if(init && nbSeenInstances > nBins){
-			  int rind = 0;
-			  for (int i = 0; i < this.nbAttributes; i++) {
-					 // if numeric and not missing, discretize
-					 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
-						 m_CutPoints[i] = sReservoirs[rind++].getBoundaries();
-					 }
-				 }
-			  return convertInstance(inst);
-		  }		  
-		  return inst;
-	  }
-	
-	@Override
 	public void updateEvaluator(Instance inst) {
 		if(!init)
 			init(inst);
@@ -110,6 +94,17 @@ public class IDAdiscretize extends MOADiscretize {
 		} else if(type.equals(IDAType.IDAW)) { // window sample
 			updateWindowSample(inst);
 		}
+		
+		// update the cutpoint matrix
+		if(init && nbSeenInstances > nBins){
+		  int rind = 0;
+		  for (int i = 0; i < this.nbAttributes; i++) {
+				 // if numeric and not missing, discretize
+				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
+					 m_CutPoints[i] = sReservoirs[rind++].getBoundaries();
+				 }
+			 }
+		}		
 
 		 if(nbSeenInstances % 101 == 0) 
 			 writeCPointsToFile(1, 2, nbSeenInstances, "IDA");

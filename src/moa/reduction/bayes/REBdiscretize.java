@@ -45,7 +45,7 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		int sampleSize = 1000;
+		int sampleSize = 2000;
 		this.sample = new Instance[sampleSize];
 	}
 	
@@ -56,30 +56,6 @@ public class REBdiscretize extends MOADiscretize {
 		this.lambda = lambda;
 		this.sample = new Instance[sampleSize];
 	}	
-
-
-	public Instance applyDiscretization(Instance inst) {
-		  if(init){
-			  for (int i = 0; i < inst.numAttributes(); i++) {
-				 // if numeric and not missing, discretize
-				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
-					 double[] boundaries = new double[allIntervals[i].size()];
-					 String[] labels = new String[allIntervals[i].size()];
-					 int j = 0;
-				 	for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-				 			.hasNext();) {
-				 		Interval interv = iterator.next();
-				 		labels[j] = Integer.toString(interv.label);
-				 		boundaries[j++] = interv.end;
-				 	}
-				 	m_Labels[i] = labels;
-				 	m_CutPoints[i] = boundaries;
-				 }
-			  }		  
-			  return convertInstance(inst);
-		  }		  
-		  return inst;
-	}
   
   public void updateEvaluator(Instance instance, float errorRate) {	  
 	  this.errorRate = errorRate;
@@ -137,6 +113,29 @@ public class REBdiscretize extends MOADiscretize {
 			  init = true;
 		  }
 	  }
+	  
+	  // update the cut points
+	  if(init){
+		  if(m_CutPoints == null)
+			  m_CutPoints = new double[numAttributes][];
+		  for (int i = 0; i < instance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+				 double[] boundaries = new double[allIntervals[i].size()];
+				 String[] labels = new String[allIntervals[i].size()];
+				 int j = 0;
+			 	for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
+			 			.hasNext();) {
+			 		Interval interv = iterator.next();
+			 		labels[j] = Integer.toString(interv.label);
+			 		boundaries[j++] = new Double(new Float(interv.end).toString()); // Accurate casting
+			 	}
+			 	m_Labels[i] = labels;
+			 	m_CutPoints[i] = boundaries;
+			 }
+		  }		  
+	  }		  
+	  
 	  if(totalCount % 101 == 0) {
 		  writeCPointsToFile(1, 2, totalCount, "Reb");
 		  writeDataToFile(1, 2, totalCount);
@@ -645,7 +644,6 @@ public class REBdiscretize extends MOADiscretize {
 	  numClasses = inst.numClasses();
 	  numAttributes = inst.numAttributes();
 	  allIntervals = new TreeMap[numAttributes];
-	  m_CutPoints = new double[numAttributes][];
 	  m_Labels = new String[numAttributes][];
 	  labelsToUse = new Queue[numAttributes];
 	  for (int i = 0; i < inst.numAttributes(); i++) {

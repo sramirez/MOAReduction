@@ -23,7 +23,10 @@ package moa.reduction.core;
 //import weka.attributeSelection.InfoGainAttributeEval; 
 //import weka.attributeSelection.Ranker;
 //import weka.attributeSelection.AttributeSelection;
-import weka.attributeSelection.*; 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
@@ -33,22 +36,15 @@ import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
-import moa.reduction.bayes.IDAdiscretize;
-import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
-import moa.reduction.bayes.OCdiscretize;
 import moa.reduction.bayes.OFSGDAttributeEval;
-import moa.reduction.bayes.PIDdiscretize;
-import moa.reduction.bayes.REBdiscretize;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import weka.attributeSelection.ASEvaluation;
+import weka.attributeSelection.AttributeSelection;
+import weka.attributeSelection.Ranker;
+import weka.core.Attribute;
 
 import com.github.javacliparser.IntOption;
 import com.yahoo.labs.samoa.instances.Instance;
-
-import weka.core.Attribute;
 
 /**
  * Naive Bayes incremental learner.
@@ -81,15 +77,10 @@ public class NaiveBayesReduction extends AbstractClassifier {
     		"The number of features to select", 10, 1, Integer.MAX_VALUE);
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
-    public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 5, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
-    		"Window size for model updates", 1, 1, Integer.MAX_VALUE);  
-    public IntOption numClassesOption = new IntOption("numClasses", 'c', 
-    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
+    		"Window size for model updates", 1, 1, Integer.MAX_VALUE); 
     
     protected static MOAAttributeEvaluator fselector = null;
-    protected static MOADiscretize discretizer = null;
     protected int totalCount = 0, classified = 0, correctlyClassified = 0;
     protected Set<Integer> selectedFeatures = new HashSet<Integer>();
     
@@ -125,31 +116,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
 				e.printStackTrace();
 			}
     	}
-	    	
-    	// Update the discretization scheme, and apply it to the given instance
-    	if(discmethodOption.getValue() != 0) {
-    		if(discretizer == null) {
-    			if(discmethodOption.getValue() == 1) {
-    	    		discretizer = new PIDdiscretize();
-    	    	} else if(discmethodOption.getValue() == 2) {
-    	    		discretizer = new IFFDdiscretize();	
-    	    	} else if(discmethodOption.getValue() == 3) {
-    	    		discretizer = new OCdiscretize(this.numClassesOption.getValue());
-    	    	} else if(discmethodOption.getValue() == 4){
-    	    		discretizer = new IDAdiscretize();
-    	    	} else {
-    	    		discretizer = new REBdiscretize();
-    	    	}
-    		}
-    		if(discmethodOption.getValue() != 5)
-    			discretizer.updateEvaluator(inst);
-    		else
-        		// REBdiscretize needs to know the error rate before removing instances
-    			((REBdiscretize) discretizer).updateEvaluator(inst, 1 - ((float) correctlyClassified / classified)); 
-    			
-    		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());
-    		rinst = discretizer.applyDiscretization(inst);
-    	}
     	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
         for (int i = 0; i < rinst.numAttributes() - 1; i++) {
@@ -164,10 +130,10 @@ public class NaiveBayesReduction extends AbstractClassifier {
             
             // Problem with spam assasin
             double value = rinst.value(instAttIndex);
-            if(rinst.value(instAttIndex) == -1) {
+            /*if(rinst.value(instAttIndex) == -1) {
             	System.out.println("Value changed");
             	value = 0;            	
-            }
+            }*/
             obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
         }
         
@@ -269,8 +235,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	Instance sinst = inst.copy();
     	if(fsmethodOption.getValue() != 0 && fselector != null) 
     		performFS(sinst);
-    	if(discmethodOption.getValue() != 0 && discretizer != null) 
-    		sinst = discretizer.applyDiscretization(sinst);
 		
 		// Naive Bayes predictions
         double[] votes = new double[observedClassDistribution.numValues()];

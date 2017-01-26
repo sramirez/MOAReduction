@@ -3,6 +3,7 @@ package moa.reduction.core;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -348,7 +349,7 @@ public abstract class MOADiscretize extends Filter {
 	
 	      Set<String> cutPointsCheck = new HashSet<String>();
 	      double[] cutPoints = m_CutPoints[i];
-	      if (!m_MakeBinary) {
+
 	        ArrayList<String> attribValues;
 	        if (cutPoints == null) {
 	          attribValues = new ArrayList<String>(1);
@@ -364,11 +365,8 @@ public abstract class MOADiscretize extends Filter {
 	        	  for (int j = 0; j < m_Labels[i].length; j++) {
 		              attribValues.add(m_Labels[i][j]);
 	        	  }  
-	          } else if (m_UseBinNumbers) {
-	            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
-	              attribValues.add("'B" + (j + 1) + "of" + (n + 1) + "'");
-	            }
-	          } else {
+	          } else {        	  
+	        	  
 	            for (int j = 0, n = cutPoints.length; j <= n; ++j) {
 	              String newBinRangeString = binRangeString(cutPoints, j,
 	                m_BinRangePrecision);
@@ -388,44 +386,7 @@ public abstract class MOADiscretize extends Filter {
 	          inputFormat.attribute(i).name(), attribValues);
 	        newAtt.setWeight(inputFormat.attribute(i).weight());
 	        attributes.add(newAtt);
-	      } else {
-	        if (cutPoints == null) {
-	        	ArrayList<String> attribValues = new ArrayList<String>(1);
-	            attribValues.add("'All'");
-	            Attribute newAtt = new Attribute(inputFormat.attribute(i)
-	              .name(), attribValues);
-	            newAtt.setWeight(inputFormat.attribute(i).weight());
-	            attributes.add(newAtt);
-	        } else {
-	          if (i < inputFormat.classIndex()) {
-	            classIndex += cutPoints.length - 1;
-	          }
-	          for (int j = 0, n = cutPoints.length; j < n; ++j) {
-	            ArrayList<String> attribValues = new ArrayList<String>(2);
-	            if (m_UseBinNumbers) {
-	              attribValues.add("'B1of2'");
-	              attribValues.add("'B2of2'");
-	            } else {
-	              double[] binaryCutPoint = { cutPoints[j] };
-	              String newBinRangeString1 = binRangeString(binaryCutPoint, 0,
-	                m_BinRangePrecision);
-	              String newBinRangeString2 = binRangeString(binaryCutPoint, 1,
-	                m_BinRangePrecision);
-	              if (newBinRangeString1.equals(newBinRangeString2)) {
-	                throw new IllegalArgumentException(
-	                  "A duplicate bin range was detected. "
-	                    + "Try increasing the bin range precision.");
-	              }
-	              attribValues.add("'" + newBinRangeString1 + "'");
-	              attribValues.add("'" + newBinRangeString2 + "'");
-	            }
-	            Attribute newAtt = new Attribute(inputFormat.attribute(i)
-	              .name() + "_" + (j + 1), attribValues);
-	            newAtt.setWeight(inputFormat.attribute(i).weight());
-	            attributes.add(newAtt);
-	          }
-	        }
-	      }
+
 	    } else {
 	      attributes.add((Attribute) inputFormat.attribute(i).copy());
 	    }
@@ -456,47 +417,37 @@ public abstract class MOADiscretize extends Filter {
 	        if (m_CutPoints[i] == null) {
 	          if (instance.isMissing(i)) {
 	            vals[index] = Utils.missingValue();
-	            instance.setValue(index, Utils.missingValue());
 	          } else {
 	            vals[index] = 0;
-	            instance.setValue(index, 0);
 	          }
-	          index++;
 	        } else {
-	          if (!m_MakeBinary) {
-	            if (instance.isMissing(i)) {
+	        	 if (instance.isMissing(i)) {
 	              vals[index] = Utils.missingValue();
-	              instance.setValue(index, Utils.missingValue());
 	            } else {
 	              for (j = 0; j < m_CutPoints[i].length; j++) {
-	                if (currentVal <= m_CutPoints[i][j]) {
+	            	float cp = (float)(Math.round((double) m_CutPoints[i][j] *1000000.0) / 1000000.0);
+	                if (currentVal <= cp) {
 	                  break;
 	                }
 	              }
-	              vals[index] = j;
-	              instance.setValue(index, j);
-	            }
-	            index++;
-	          } else {
-	            for (j = 0; j < m_CutPoints[i].length; j++) {
-	              if (instance.isMissing(i)) {
-	                vals[index] = Utils.missingValue();
-	                instance.setValue(index, Utils.missingValue());
-	              } else if (currentVal <= m_CutPoints[i][j]) {
-	                vals[index] = 0;
-	                instance.setValue(index, 0);
+	              if(m_Labels != null) {
+	            	  if(m_Labels[i] != null) {
+	            		  if(j < m_Labels[i].length)
+	            			  vals[index] = Float.parseFloat(m_Labels[i][j]);
+	            		  else 
+	            			  vals[index] = 0;
+	            	  } else {
+	            		  vals[index] = j;
+	            	  }
 	              } else {
-	                vals[index] = 1;
-	                instance.setValue(index, 1);
+	            	  vals[index] = j;
 	              }
-	              index++;
 	            }
-	          }
 	        }
 	      } else {
 	        vals[index] = instance.value(i);
-	        index++;
 	      }
+	      index++;
 	    }
 	    
 	    Instance outI = null;

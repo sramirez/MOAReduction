@@ -30,7 +30,8 @@ public class ExperimentTest {
         		Classifier learner = new NaiveBayesReduction();
                 
                 //RandomRBFGenerator stream = new RandomRBFGenerator();
-                ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/spambase.arff", -1);
+        		ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/elecNormNew.arff", -1);
+                //ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/sudden_drift_med.arff", -1);
         		//ArffFileStream stream = new ArffFileStream("/home/sramirez/TEST_FUSINTER/datasets/spambase/spambase-10-1tra-weka.dat", -1);
         		//ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/gradual_drift_100k.arff", -1);
         		
@@ -60,6 +61,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(10000, true);
+                exp.run(1000000, true);
         }
 }

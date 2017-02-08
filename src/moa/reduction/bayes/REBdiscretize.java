@@ -18,6 +18,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import moa.core.TimingUtils;
 import moa.reduction.core.MOADiscretize;
 
 import com.yahoo.labs.samoa.instances.Instance;
@@ -34,10 +35,14 @@ public class REBdiscretize extends MOADiscretize {
 	boolean init = false;
 	private long seed = 317901561;
 	private float lambda, alpha, errorRate = 0.25f;
-	private static int MAX_OLD = 5, INIT_TH = 100;
+	private static int MAX_OLD = 5;
+	private int initTh;
 	private static float ERR_TH = 0.25f;
 	private Random rand;
 	private Queue<Integer>[] labelsToUse;
+	//private int nbound = 0;
+	
+	//private double sumTime = 0;
 	
 	public REBdiscretize() {
 		// TODO Auto-generated constructor stub
@@ -45,16 +50,15 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		int sampleSize = 1000;
-		this.sample = new Instance[sampleSize];
+		this.sample = new Instance[2500];
+		this.initTh = 2500;
 	}
 	
-	public REBdiscretize(float alpha, float lambda, int sampleSize) {
+	public REBdiscretize(int sampleSize, int initTh) {
 		// TODO Auto-generated constructor stub
 		this();
-		this.alpha = alpha;
-		this.lambda = lambda;
 		this.sample = new Instance[sampleSize];
+		this.initTh = initTh;
 	}	
 
 
@@ -92,6 +96,19 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
+	  /*if(totalCount % 25000 == 0) {
+		  System.out.println("Number of boundaries: " + nbound);
+		  System.out.println("Total boundary evaluation time: " + sumTime);
+		  long totalHistograms = 0;
+		  for(int i = 0; i < numAttributes; i++){
+			  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
+			 			.hasNext();) {
+		 		Interval interv = iterator.next();
+		 		totalHistograms += interv.histogram.size();
+			  }
+		  }
+		  System.out.println("Total elems in histograms: " + totalHistograms);
+	  }*/
 
 	  Instance replacedInstance = null;
 	  if(totalCount > sample.length){
@@ -106,8 +123,11 @@ public class REBdiscretize extends MOADiscretize {
 	  }
     
 	  // If there are enough instances to initialize cut points, do it!
-	  if(totalCount >= INIT_TH){
+	  if(totalCount >= initTh){
 		  if(init) {
+			  //System.out.println("Total count: " + totalCount);
+			  //System.out.println("Number of elems in histograms: " + getSizeHistograms(1));
+			  
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
@@ -131,16 +151,33 @@ public class REBdiscretize extends MOADiscretize {
 					 checkLabelIntervals();*/
 					 //checkIntervalCriterions();
 				 }
-			  }			  
+			  }		
+			  replacedInstance = null;
 		  } else {
 			  batchFusinter();
 			  init = true;
 		  }
 	  }
-	  if(totalCount % 101 == 0) {
+	  /*if(totalCount % 101 == 0) {
 		  writeCPointsToFile(1, 2, totalCount, "Reb");
 		  writeDataToFile(1, 2, totalCount);
+	  }*/
+  }
+  
+  
+  private int getSizeHistograms(int att) {
+	  int total = 0;
+	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); iterator
+	 			.hasNext();) {
+ 		Interval interv = iterator.next();
+ 		for (Iterator iterator2 = interv.histogram.entrySet().iterator(); iterator2.hasNext();) {
+			Entry<Float, int[]> entry = (Entry) iterator2.next();
+			int[] cd = entry.getValue();
+			for(int i = 0; i < cd.length; i++)
+				total += cd[i];
+		}
 	  }
+	  return total;
   }
   
   private void checkIntervalCriterions(){
@@ -239,13 +276,17 @@ public class REBdiscretize extends MOADiscretize {
 		 Interval central = centralE.getValue();
 		 // If it is a boundary point, evaluate six different cutting alternatives
 		 if(isBoundary(att, central, val, cls)){
+			  //nbound++;
+		 //if(true){
 			  // Remove before changing end value in central
 			  allIntervals[att].remove(centralE.getKey());
 			  // Add splitting point before dividing the interval
 			  central.addPoint(val, cls);
 			  central.updateCriterion();
 			  // Split the interval
+			  //long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 			  Interval splitI = central.splitInterval(att, val); // Criterion is updated for both intervals
+			  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
 			  Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
 			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
 			  LinkedList<Interval> intervalList = new LinkedList<Interval>();
@@ -303,6 +344,7 @@ public class REBdiscretize extends MOADiscretize {
 		 Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
 		 // Delete surrounding interval before starting
 		 LinkedList<Interval> intervalList = new LinkedList<Interval>();
+		 //int ninterv = allIntervals[att].size();
 		 if(lowerE != null) {					 
 			 intervalList.add(lowerE.getValue());
 			 allIntervals[att].remove(lowerE.getKey());
@@ -317,21 +359,19 @@ public class REBdiscretize extends MOADiscretize {
 		 }
 		 
 		 // Get the new interval from the splitting to test (if it is not the last interval and point)
-		 if(allIntervals[att].size() > 1 && central.histogram.size() > 1) {
+		 //if(ninterv > 1 || central.histogram.size() > 1) {
 			 // remove before changing end value in central
 			 central.removePoint(att, val, cls);
 			 central.updateCriterion();
-		 }
+		 //}
 		 Interval splittedInterval = null;
 		 // If central is empty, so we merge it with its prior interval or we just remove it
 		 if(central.histogram.isEmpty()){
-			 if(lowerE != null) {
-				 //allIntervals[i].remove(lowerE.getKey());
+			 intervalList.remove(central);
+			 /*if(lowerE != null) {
 				 int oldlab = lowerE.getValue().mergeIntervals(central);
 				 labelsToUse[att].add(oldlab);
-				 // Replace old end with the new compelling interval 
-				 //allIntervals[i].put(lowerE.getValue().end, lowerE.getValue());	 
-			 }// else {
+			 }*/// else {
 				 // Just remove central from map
 				 //allIntervals[i].remove(central.end);
 			 //}
@@ -419,38 +459,42 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private boolean isBoundary(int att, Interval ceiling, float value, int clas){
-	  Entry<Float, int[]> following = ceiling.histogram.ceilingEntry(value);
+	        
 	  boolean boundary = false;
-	  // The next point is in another interval (interval with a single point)
-	  if(following == null) {		  
-		  Entry<Float, Interval> higherE = allIntervals[att].higherEntry(ceiling.end);
-		  if(higherE == null) {
-			  boundary = true; // no more points at the right side
-		  } else {
-			  following = higherE.getValue().histogram.ceilingEntry(value);
-			  int[] cd1 = following.getValue();		
-			  int[] cd2 = new int[cd1.length];
-			  cd2[clas]++;
-			  boundary = isBoundary(cd1, cd2);
-		  }
-	  } else {
-		  // If the point already exists before, evaluate if it is now a boundary
-		  if(following.getKey() == value) {
-			  Entry<Float, int[]> nextnext = ceiling.histogram.higherEntry(value);
-			  if(nextnext != null) {
-				  int[] cd1 = following.getValue();				  
-				  cd1[clas]++;
-				  boundary = isBoundary(cd1, nextnext.getValue());
-				  cd1[clas]--;
+	  
+	  if(value != ceiling.end) {
+		  Entry<Float, int[]> following = ceiling.histogram.ceilingEntry(value);		  
+		  // The next point is in another interval (interval with a single point)
+		  if(following == null) {		  
+			  Entry<Float, Interval> higherE = allIntervals[att].higherEntry(ceiling.end);
+			  if(higherE == null) {
+				  boundary = true; // no more points at the right side
 			  } else {
-				  // Last point in the interval, it does not make sense to split
-				  boundary = false;
+				  following = higherE.getValue().histogram.ceilingEntry(value);
+				  int[] cd1 = following.getValue();		
+				  int[] cd2 = new int[cd1.length];
+				  cd2[clas]++;
+				  boundary = isBoundary(cd1, cd2);
 			  }
 		  } else {
-			  int[] cd1 = following.getValue();		
-			  int[] cd2 = new int[cd1.length];
-			  cd2[clas]++;
-			  boundary = isBoundary(cd1, cd2);
+			  // If the point already exists before, evaluate if it is now a boundary
+			  if(following.getKey() == value) {
+				  Entry<Float, int[]> nextnext = ceiling.histogram.higherEntry(value);
+				  if(nextnext != null) {
+					  int[] cd1 = following.getValue();				  
+					  cd1[clas]++;
+					  boundary = isBoundary(cd1, nextnext.getValue());
+					  cd1[clas]--;
+				  } else {
+					  // Last point in the interval, it does not make sense to split
+					  boundary = false;
+				  }
+			  } else {
+				  int[] cd1 = following.getValue();		
+				  int[] cd2 = new int[cd1.length];
+				  cd2[clas]++;
+				  boundary = isBoundary(cd1, cd2);
+			  }
 		  }
 	  }
 	  return boundary;
@@ -529,11 +573,13 @@ public class REBdiscretize extends MOADiscretize {
   
   private void evaluateLocalMerges(int att, List<Interval> intervalList) {
 	
-	boolean batch = intervalList.size() == allIntervals[att].size();
-	float lowth = Float.POSITIVE_INFINITY;
-	if(!batch)
-		lowth = lowConfidenceTh(allIntervals[att].values(), 0f);  
-	int nmerges = 0;
+	HashSet<Integer> unchangedIntervals = new HashSet<Integer>();
+	ArrayList<Integer> indices = new ArrayList<Integer>();
+	
+	for (int i = 0; i < intervalList.size(); i++) {
+		unchangedIntervals.add(i);
+		indices.add(i);		
+	}
 	
 	while(intervalList.size() > 1) {
 		float globalDiff = 0;
@@ -541,16 +587,6 @@ public class REBdiscretize extends MOADiscretize {
 		for(int i = 0; i < intervalList.size() - 1; i++) {
 			float newLocalCrit = evaluteMerge(intervalList.get(i).cd, intervalList.get(i+1).cd);
 			float difference = intervalList.get(i).crit + intervalList.get(i+1).crit - newLocalCrit;
-			
-			//if(difference > globalDiff && (newLocalCrit < lowth || nmerges < 1)){
-			/*boolean condition = difference > globalDiff;
-			if(nmerges > 0) {
-				condition = difference > (intervalList.get(i).crit + intervalList.get(i+1).crit) / 2.0f;
-			}
-			if(condition) {
-				posMin = i;
-				globalDiff = difference;
-			}*/
 			if(difference > globalDiff){
 				posMin = i;
 				globalDiff = difference;
@@ -563,7 +599,6 @@ public class REBdiscretize extends MOADiscretize {
 			Interval int2 = intervalList.remove(posMin+1);
 			int oldlab = int1.mergeIntervals(int2);
 			labelsToUse[att].add(oldlab);
-			nmerges++;
 		} else {
 			break;
 		}
@@ -651,7 +686,7 @@ public class REBdiscretize extends MOADiscretize {
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 		  labelsToUse[i] = new LinkedList<Integer>();
-		  for (int j = 0; j < sample.length; j++) {
+		  for (int j = 1; j < sample.length + 1; j++) {
 				labelsToUse[i].add(j);
 			}
 	  }  
@@ -774,7 +809,9 @@ public class REBdiscretize extends MOADiscretize {
 						break;
 					}						
 				}
-				if(delete){
+				//if(histogram.size() < 2 && delete)
+					//System.err.println("Interval with a single point");
+				if(delete){ // We keep intervals with at least one point
 					histogram.remove(value);
 				}
 			} else {
@@ -804,7 +841,8 @@ public class REBdiscretize extends MOADiscretize {
 			TreeMap<Float, int[]> nHist = new TreeMap<Float, int[]>();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
-			for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
+			
+			/*for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
 				Entry<Float, int[]> entry = (Entry) iterator.next();
 				if(entry.getKey() > value){
 					//histogram.entries().remove(entry);
@@ -815,6 +853,16 @@ public class REBdiscretize extends MOADiscretize {
 					}					
 					iterator.remove();
 				}				
+			}*/
+			for (Iterator iterator = histogram.tailMap(value, false).entrySet().iterator(); iterator.hasNext();) {
+				Entry<Float, int[]> entry = (Entry) iterator.next();
+				//histogram.entries().remove(entry);
+				nHist.put(entry.getKey(), entry.getValue());
+				for(int i = 0; i < entry.getValue().length; i++){
+					nCd[i] += entry.getValue()[i];
+					cd[i] -= entry.getValue()[i];
+				}					
+				iterator.remove();
 			}
 			
 			if(nHist.isEmpty())

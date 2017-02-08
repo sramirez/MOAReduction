@@ -357,7 +357,7 @@ public abstract class MOADiscretize extends Filter {
 	        } else {
 	          attribValues = new ArrayList<String>(cutPoints.length + 1);
 	          boolean predefinedLabels = false;
-	          if(m_Labels != null) {
+	          if(m_Labels != null && m_Labels[i] != null) {
 	        	  if(m_Labels[i].length == m_CutPoints[i].length)
 	        		  predefinedLabels = true;
 	          }

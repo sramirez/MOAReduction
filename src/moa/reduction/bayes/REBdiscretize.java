@@ -50,8 +50,8 @@ public class REBdiscretize extends MOADiscretize {
 		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		this.sample = new Instance[2500];
-		this.initTh = 2500;
+		this.sample = new Instance[10000];
+		this.initTh = 100;
 	}
 	
 	public REBdiscretize(int sampleSize, int initTh) {
@@ -96,9 +96,9 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
-	  /*if(totalCount % 25000 == 0) {
-		  System.out.println("Number of boundaries: " + nbound);
-		  System.out.println("Total boundary evaluation time: " + sumTime);
+	  /*if(totalCount % 10000 == 0) {
+		  //System.out.println("Number of boundaries: " + nbound);
+		  //System.out.println("Total boundary evaluation time: " + sumTime);
 		  long totalHistograms = 0;
 		  for(int i = 0; i < numAttributes; i++){
 			  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
@@ -268,7 +268,7 @@ public class REBdiscretize extends MOADiscretize {
   private void insertExample(int att, Instance instance){
   	 // INSERTION
      int cls = (int) instance.classValue();
-	 float val = (float) instance.value(att);
+     float val = getInstanceValue(instance, att);
 	 // Get the ceiling interval for the given value
 	 Map.Entry<Float, Interval> centralE = allIntervals[att].ceilingEntry(val);
 	 // The point is within the range defined by centralE, if not a new maximum interval is created
@@ -335,7 +335,7 @@ public class REBdiscretize extends MOADiscretize {
   
   private void deleteExample(int att, Instance instance) {
 	 int cls = (int) instance.classValue();
-	 float val = (float) instance.value(att);
+	 float val = getInstanceValue(instance, att);
 	 // Find the interval containing the point to be removed
 	 Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(val);
 	 if(ceilingE != null){ // The point must be contained in any previously inserted interval
@@ -359,7 +359,7 @@ public class REBdiscretize extends MOADiscretize {
 		 }
 		 
 		 // Get the new interval from the splitting to test (if it is not the last interval and point)
-		 //if(ninterv > 1 || central.histogram.size() > 1) {
+		 //if(allIntervals[att].size() > 1 && central.histogram.size() > 1) {
 			 // remove before changing end value in central
 			 central.removePoint(att, val, cls);
 			 central.updateCriterion();
@@ -368,6 +368,7 @@ public class REBdiscretize extends MOADiscretize {
 		 // If central is empty, so we merge it with its prior interval or we just remove it
 		 if(central.histogram.isEmpty()){
 			 intervalList.remove(central);
+			 labelsToUse[att].add(central.label);
 			 /*if(lowerE != null) {
 				 int oldlab = lowerE.getValue().mergeIntervals(central);
 				 labelsToUse[att].add(oldlab);
@@ -542,7 +543,7 @@ public class REBdiscretize extends MOADiscretize {
 			  Integer[] idx = new Integer[nvalid];
 			  for (int j = 0; j < idx.length; j++) {
 				  idx[j] = j;
-				  sorted[i][j] = (float) sample[j].value(i);
+				  sorted [i][j] = getInstanceValue(sample[j], i);
 			  }
 			  final float[] data = sorted[i];
 			  
@@ -633,13 +634,13 @@ public class REBdiscretize extends MOADiscretize {
 		
 	  	TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
 		LinkedList<Tuple<Float, int[]>> distinctPoints = new LinkedList<Tuple<Float, int[]>>();
-		float valueAnt = (float) sample[idx[0]].value(att);
+		float valueAnt = getInstanceValue(sample[idx[0]], att);
 		int classAnt = (int) sample[idx[0]].classValue();
 		int[] cd = new int[numClasses];
 		cd[classAnt]++;
 		// Compute statically the set of distinct points (boundary)
 		for(int i = 1; i < idx.length;i++) {
-			float val = (float) sample[idx[i]].value(att);
+			float val = getInstanceValue(sample[idx[i]], att);
 			int clas = (int) sample[idx[i]].classValue();
 			if(val == valueAnt) {
 				cd[clas]++;
@@ -690,6 +691,11 @@ public class REBdiscretize extends MOADiscretize {
 				labelsToUse[i].add(j);
 			}
 	  }  
+  }
+  
+  private float getInstanceValue(Instance instance, int iatt) {
+	  return (float) (Math.round(instance.value(iatt) * 1000.0) / 1000.0);
+	  //return (float) instance.value(iatt);
   }
 	
 	class Interval {
@@ -972,6 +978,7 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 	}
+	
 	
 	public class Tuple<X, Y> { 
 		  public final X x; 

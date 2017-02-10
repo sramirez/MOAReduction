@@ -29,35 +29,34 @@ public class REBdiscretize extends MOADiscretize {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private int totalCount, isample = 0, numClasses, numAttributes;
+	private int totalCount, numClasses, numAttributes;
 	TreeMap<Float, Interval>[] allIntervals;
-	Instance[] sample;
+	//Instance[] sample;
 	boolean init = false;
 	private long seed = 317901561;
-	private float lambda, alpha, errorRate = 0.25f;
-	private static int MAX_OLD = 5;
-	private int initTh;
-	private static float ERR_TH = 0.25f;
-	private Random rand;
+	private float lambda, alpha;
 	private Queue<Integer>[] labelsToUse;
+	private int initTh;
+	private static int MAX_OLD = 5;
+	private static int MAX_HIST = 10000;
+	private static int MAX_LABELS = 1000;
+
+	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	//private int nbound = 0;
 	
-	//private double sumTime = 0;
+	private double sumTime = 0;
 	
 	public REBdiscretize() {
 		// TODO Auto-generated constructor stub
 		setAttributeIndices("first-last");
-		this.rand = new Random(seed);
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		this.sample = new Instance[10000];
-		this.initTh = 100;
+		this.initTh = 1000;
 	}
 	
 	public REBdiscretize(int sampleSize, int initTh) {
 		// TODO Auto-generated constructor stub
 		this();
-		this.sample = new Instance[sampleSize];
 		this.initTh = initTh;
 	}	
 
@@ -85,20 +84,15 @@ public class REBdiscretize extends MOADiscretize {
 		  return inst;
 	}
   
-  public void updateEvaluator(Instance instance, float errorRate) {	  
-	  this.errorRate = errorRate;
-	  updateEvaluator(instance);
-  }
-  
   public void updateEvaluator(Instance instance) {	  
 	  if(m_CutPoints == null) {
 		  initializeLayers(instance);
 	  }
 	  
 	  totalCount++;
-	  /*if(totalCount % 10000 == 0) {
+	  if(totalCount % 45312 == 0) {
 		  //System.out.println("Number of boundaries: " + nbound);
-		  //System.out.println("Total boundary evaluation time: " + sumTime);
+		  System.out.println("Total boundary evaluation time: " + sumTime);
 		  long totalHistograms = 0;
 		  for(int i = 0; i < numAttributes; i++){
 			  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
@@ -108,18 +102,15 @@ public class REBdiscretize extends MOADiscretize {
 			  }
 		  }
 		  System.out.println("Total elems in histograms: " + totalHistograms);
-	  }*/
+	  }
 
-	  Instance replacedInstance = null;
-	  if(totalCount > sample.length){
-		  if(rand.nextFloat() < errorRate + ERR_TH){
-			 int pos = isample % sample.length;
-			 replacedInstance = sample[pos];
-			 sample[pos] = instance.copy();
-		  } 
-		  isample++;
-	  } else {
-		  sample[totalCount - 1] = instance.copy();
+	  // Queue new values
+	  for (int i = 0; i < instance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+				 elemQ[i].add(new Tuple<Float, Byte>(
+						 getInstanceValue(instance.value(i)), (byte)instance.classValue()));
+			 }
 	  }
     
 	  // If there are enough instances to initialize cut points, do it!
@@ -139,8 +130,12 @@ public class REBdiscretize extends MOADiscretize {
 					 //System.out.println("Number of intervals: " + nint);
 					 //checkGlobalCriterions();
 					 //checkRangeIntervals();
-					 if(replacedInstance != null)
+					 /*if(replacedInstance != null){
+						 long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 						 deleteExample(i, replacedInstance);
+						 sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
+					 }*/
+						 
 					 /*nint = 0;
 					 for (int j = 0; j < allIntervals.length; j++) {
 						 nint += allIntervals[j].size() + 1;
@@ -152,9 +147,9 @@ public class REBdiscretize extends MOADiscretize {
 					 //checkIntervalCriterions();
 				 }
 			  }		
-			  replacedInstance = null;
+			  //replacedInstance = null;
 		  } else {
-			  batchFusinter();
+			  batchFusinter(instance);
 			  init = true;
 		  }
 	  }
@@ -164,6 +159,42 @@ public class REBdiscretize extends MOADiscretize {
 	  }*/
   }
   
+  
+  private void removeOldsUntilGap(int att, int ngaps, Interval interv) {
+	  int cont = 0;
+	  int oldSize = interv.histogram.size();
+	  while(!elemQ[att].isEmpty() && cont < ngaps) {
+		  Tuple<Float, Byte> elem = elemQ[att].poll();
+		  removePointFromInteravls(att, elem);
+		  if(interv.histogram.size() < oldSize)
+			  cont++;
+	  }
+	  
+  }
+  
+  private void removeNOlds(int att, int noldies) {
+	  int cont = 0;
+	  while(!elemQ[att].isEmpty() && cont < noldies) {
+		  Tuple<Float, Byte> elem = elemQ[att].poll();
+		  if(removePointFromInteravls(att, elem))
+			  cont++;
+	  }
+	  
+  }
+  
+  private boolean removePointFromInteravls(int att, Tuple<Float, Byte> elem) {
+	  Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(elem.x);
+	  if(ceilingE != null){
+		  ceilingE.getValue().removePoint(att, elem.x, elem.y);
+		  // If interval is empty, remove it from the list
+		  if(ceilingE.getValue().histogram.isEmpty()) {
+			  allIntervals[att].remove(ceilingE.getKey());
+			  labelsToUse[att].add(ceilingE.getValue().label);
+		  }
+		  return true;
+	  }
+	  return false;
+  }
   
   private int getSizeHistograms(int att) {
 	  int total = 0;
@@ -268,7 +299,7 @@ public class REBdiscretize extends MOADiscretize {
   private void insertExample(int att, Instance instance){
   	 // INSERTION
      int cls = (int) instance.classValue();
-     float val = getInstanceValue(instance, att);
+     float val = getInstanceValue(instance.value(att));
 	 // Get the ceiling interval for the given value
 	 Map.Entry<Float, Interval> centralE = allIntervals[att].ceilingEntry(val);
 	 // The point is within the range defined by centralE, if not a new maximum interval is created
@@ -281,7 +312,7 @@ public class REBdiscretize extends MOADiscretize {
 			  // Remove before changing end value in central
 			  allIntervals[att].remove(centralE.getKey());
 			  // Add splitting point before dividing the interval
-			  central.addPoint(val, cls);
+			  central.addPoint(att, val, cls);
 			  central.updateCriterion();
 			  // Split the interval
 			  //long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
@@ -307,7 +338,7 @@ public class REBdiscretize extends MOADiscretize {
 			  insertIntervals(att, intervalList);
 		 } else {
 			 // If not, just add the point to the interval
-			 central.addPoint(val, cls);
+			 central.addPoint(att, val, cls);
 			 central.updateCriterion();
 			 // Update the key with the bigger end
 			 if(centralE.getKey() != central.end) {
@@ -335,7 +366,7 @@ public class REBdiscretize extends MOADiscretize {
   
   private void deleteExample(int att, Instance instance) {
 	 int cls = (int) instance.classValue();
-	 float val = getInstanceValue(instance, att);
+	 float val = getInstanceValue(instance.value(att));
 	 // Find the interval containing the point to be removed
 	 Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(val);
 	 if(ceilingE != null){ // The point must be contained in any previously inserted interval
@@ -406,9 +437,9 @@ public class REBdiscretize extends MOADiscretize {
 		}
 	  PrintWriter dataout = new PrintWriter(data);
 	  
-	  for (int i = 0; i < sample.length && sample[i] != null; i++) {
-		  dataout.print(sample[i].value(att1) + "," + 
-				  sample[i].value(att2) + "," + sample[i].classValue() + "\n");
+	  for (int i = 0; i < elemQ.length; i++) {
+		  dataout.print(getInstanceValue(elemQ[att1].get(i).x) + "," + 
+				  getInstanceValue(elemQ[att2].get(i).x) + "," + getInstanceValue(elemQ[att1].get(i).y) + "\n");
 	  }
 	  
 	  //Flush the output to the file
@@ -526,24 +557,26 @@ public class REBdiscretize extends MOADiscretize {
 	  }	  
   }
   
-  private void batchFusinter() {
+  private void batchFusinter(Instance model) {
 	  // TODO Auto-generated method stub
-	  float[][] sorted = new float[numAttributes][sample.length];
-	  final int[] classData = new int[sample.length];
+	  float[][] sorted = new float[numAttributes][];
+	  final int[] classData = new int[elemQ[0].size()];
 	  int nvalid = 0;
-	  for (int j = 0; j < sample.length && sample[j] != null; j++) {
-		  classData[j] = (int) sample[j].classValue();
+	  // && elemQ[0].get(j) != null
+	  for (int j = 0; j < elemQ[0].size(); j++) {
+		  classData[j] = elemQ[0].get(j).y;
 		  nvalid++;
 	  }
 	  
 	  for (int i = numAttributes - 1; i >= 0; i--) {
 		  if ((m_DiscretizeCols.isInRange(i))
-				  && (sample[0].attribute(i).isNumeric())
-				  && (sample[0].classIndex() != i)) {
+				  && (model.attribute(i).isNumeric())
+				  && (model.classIndex() != i)) {
 			  Integer[] idx = new Integer[nvalid];
+			  sorted[i] = new float[elemQ[i].size()];
 			  for (int j = 0; j < idx.length; j++) {
 				  idx[j] = j;
-				  sorted [i][j] = getInstanceValue(sample[j], i);
+				  sorted [i][j] = getInstanceValue(elemQ[i].get(j).x);
 			  }
 			  final float[] data = sorted[i];
 			  
@@ -634,14 +667,14 @@ public class REBdiscretize extends MOADiscretize {
 		
 	  	TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
 		LinkedList<Tuple<Float, int[]>> distinctPoints = new LinkedList<Tuple<Float, int[]>>();
-		float valueAnt = getInstanceValue(sample[idx[0]], att);
-		int classAnt = (int) sample[idx[0]].classValue();
+		float valueAnt = getInstanceValue(elemQ[att].get(idx[0]).x);
+		int classAnt = elemQ[att].get(idx[0]).y;
 		int[] cd = new int[numClasses];
 		cd[classAnt]++;
 		// Compute statically the set of distinct points (boundary)
 		for(int i = 1; i < idx.length;i++) {
-			float val = getInstanceValue(sample[idx[i]], att);
-			int clas = (int) sample[idx[i]].classValue();
+			float val = getInstanceValue(elemQ[att].get(idx[i]).x);
+			int clas = elemQ[att].get(idx[i]).y;
 			if(val == valueAnt) {
 				cd[clas]++;
 			} else {
@@ -684,18 +717,21 @@ public class REBdiscretize extends MOADiscretize {
 	  m_CutPoints = new double[numAttributes][];
 	  m_Labels = new String[numAttributes][];
 	  labelsToUse = new Queue[numAttributes];
+	  elemQ = new LinkedList[numAttributes];
+	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 		  labelsToUse[i] = new LinkedList<Integer>();
-		  for (int j = 1; j < sample.length + 1; j++) {
+		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();		  
+		  for (int j = 1; j < MAX_LABELS; j++) {
 				labelsToUse[i].add(j);
 			}
 	  }  
   }
   
-  private float getInstanceValue(Instance instance, int iatt) {
-	  return (float) (Math.round(instance.value(iatt) * 1000.0) / 1000.0);
-	  //return (float) instance.value(iatt);
+  private float getInstanceValue(double value) {
+	  //return (float) (Math.round(value * 1000.0) / 1000.0);
+	  return (float) value;
   }
 	
 	class Interval {
@@ -756,12 +792,16 @@ public class REBdiscretize extends MOADiscretize {
 			histogram.putAll(other.histogram);
 		}
 		
-		public void addPoint(float value, int cls){
+		public void addPoint(int att, float value, int cls){
 			//checkHistogramIntervals(this);
 			int[] pd = histogram.get(value);
 			if(pd != null) {
 				pd[cls]++;
 			} else {
+				// Make an spot for new points, size limit's been achieved
+				if(histogram.size() > MAX_HIST) {
+					removeOldsUntilGap(att, 1, this);
+				}
 				pd = new int[cd.length];
 				pd[cls]++;
 				histogram.put(value, pd);

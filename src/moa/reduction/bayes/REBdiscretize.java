@@ -35,12 +35,10 @@ public class REBdiscretize extends MOADiscretize {
 	boolean init = false;
 	private long seed = 317901561;
 	private float lambda, alpha;
-	private Queue<Integer>[] labelsToUse;
 	private int initTh;
 	private static int MAX_OLD = 5;
 	private static int MAX_HIST = 10000;
 	private int[] maxlabels;
-
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	//private int nbound = 0;
 	
@@ -189,7 +187,6 @@ public class REBdiscretize extends MOADiscretize {
 		  // If interval is empty, remove it from the list
 		  if(ceilingE.getValue().histogram.isEmpty()) {
 			  allIntervals[att].remove(ceilingE.getKey());
-			  labelsToUse[att].add(ceilingE.getValue().label);
 		  }
 		  return true;
 	  }
@@ -399,7 +396,6 @@ public class REBdiscretize extends MOADiscretize {
 		 // If central is empty, so we merge it with its prior interval or we just remove it
 		 if(central.histogram.isEmpty()){
 			 intervalList.remove(central);
-			 labelsToUse[att].add(central.label);
 			 /*if(lowerE != null) {
 				 int oldlab = lowerE.getValue().mergeIntervals(central);
 				 labelsToUse[att].add(oldlab);
@@ -632,7 +628,6 @@ public class REBdiscretize extends MOADiscretize {
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
 			int oldlab = int1.mergeIntervals(int2);
-			labelsToUse[att].add(oldlab);
 		} else {
 			break;
 		}
@@ -716,18 +711,13 @@ public class REBdiscretize extends MOADiscretize {
 	  allIntervals = new TreeMap[numAttributes];
 	  m_CutPoints = new double[numAttributes][];
 	  m_Labels = new String[numAttributes][];
-	  labelsToUse = new Queue[numAttributes];
 	  elemQ = new LinkedList[numAttributes];
 	  maxlabels = new int[numAttributes];
 	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
-		  labelsToUse[i] = new LinkedList<Integer>();
 		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();	
-		  maxlabels[i] = 100000;
-		  for (int j = 1; j < maxlabels[i]; j++) {
-				labelsToUse[i].add(j);
-			}
+		  maxlabels[i] = 1;
 	  }  
   }
   
@@ -737,11 +727,8 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private int getLabel(int att){ 
-	  if(labelsToUse[att].isEmpty()){
-		  maxlabels[att]++;
-		  return maxlabels[att] - 1;
-	  }
-	  return labelsToUse[att].poll();
+	  maxlabels[att]++;
+	  return maxlabels[att] - 1;
   }
 	
 	class Interval {

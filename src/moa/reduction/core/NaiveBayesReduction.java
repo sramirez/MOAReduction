@@ -86,7 +86,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 2500, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
-    		"Threshold for initialization", 100, 1, Integer.MAX_VALUE);  
+    		"Threshold for initialization", 1000, 1, Integer.MAX_VALUE);  
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
     		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
     

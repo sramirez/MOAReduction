@@ -39,7 +39,7 @@ public class REBdiscretize extends MOADiscretize {
 	private int initTh;
 	private static int MAX_OLD = 5;
 	private static int MAX_HIST = 10000;
-	private static int MAX_LABELS = 1000;
+	private int[] maxlabels;
 
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	//private int nbound = 0;
@@ -51,7 +51,7 @@ public class REBdiscretize extends MOADiscretize {
 		setAttributeIndices("first-last");
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		this.initTh = 1000;
+		this.initTh = 100;
 	}
 	
 	public REBdiscretize(int sampleSize, int initTh) {
@@ -90,7 +90,7 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
-	  if(totalCount % 45312 == 0) {
+	  if(totalCount % 100000 == 0) {
 		  //System.out.println("Number of boundaries: " + nbound);
 		  System.out.println("Total boundary evaluation time: " + sumTime);
 		  long totalHistograms = 0;
@@ -356,7 +356,7 @@ public class REBdiscretize extends MOADiscretize {
 			 allIntervals[att].remove(priorE.getKey());
 		 }
 		 
-		 Interval nInt = new Interval(labelsToUse[att].poll(), val, cls);
+		 Interval nInt = new Interval(getLabel(att), val, cls);
 		 intervalList.add(nInt);
 		 evaluateLocalMerges(att, intervalList);
 		 insertIntervals(att, intervalList);
@@ -688,7 +688,7 @@ public class REBdiscretize extends MOADiscretize {
 		distinctPoints.add(new Tuple<Float, int[]>(valueAnt, cd));
 		
 		// Filter only those that are on the class boundaries
-		Interval interval = new Interval(labelsToUse[att].poll());
+		Interval interval = new Interval(getLabel(att));
 		Tuple<Float, int[]> t1 = distinctPoints.get(0);
 		interval.addPoint(t1);
 		
@@ -698,7 +698,7 @@ public class REBdiscretize extends MOADiscretize {
 				// Compute the criterion value and add them to the pool
 				interval.updateCriterion(); // Important!
 				intervals.put(t1.x, interval);
-				interval = new Interval(labelsToUse[att].poll());	
+				interval = new Interval(getLabel(att));	
 			}
 			interval.addPoint(t2);
 			t1 = t2;
@@ -718,12 +718,14 @@ public class REBdiscretize extends MOADiscretize {
 	  m_Labels = new String[numAttributes][];
 	  labelsToUse = new Queue[numAttributes];
 	  elemQ = new LinkedList[numAttributes];
+	  maxlabels = new int[numAttributes];
 	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 		  labelsToUse[i] = new LinkedList<Integer>();
-		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();		  
-		  for (int j = 1; j < MAX_LABELS; j++) {
+		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();	
+		  maxlabels[i] = 100000;
+		  for (int j = 1; j < maxlabels[i]; j++) {
 				labelsToUse[i].add(j);
 			}
 	  }  
@@ -732,6 +734,14 @@ public class REBdiscretize extends MOADiscretize {
   private float getInstanceValue(double value) {
 	  //return (float) (Math.round(value * 1000.0) / 1000.0);
 	  return (float) value;
+  }
+  
+  private int getLabel(int att){ 
+	  if(labelsToUse[att].isEmpty()){
+		  maxlabels[att]++;
+		  return maxlabels[att] - 1;
+	  }
+	  return labelsToUse[att].poll();
   }
 	
 	class Interval {
@@ -932,10 +942,10 @@ public class REBdiscretize extends MOADiscretize {
 			// Label management
 			Interval nInterval = new Interval();
 			if(s1 > s2){
-				nInterval.label = labelsToUse[att].poll();
+				nInterval.label = getLabel(att);
 			} else {
 				nInterval.label = this.label;
-				this.label = labelsToUse[att].poll();
+				this.label = getLabel(att);
 			}
 			nInterval.cd = nCd;
 			nInterval.histogram = nHist;

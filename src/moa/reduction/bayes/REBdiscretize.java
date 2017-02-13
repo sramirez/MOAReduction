@@ -38,6 +38,7 @@ public class REBdiscretize extends MOADiscretize {
 	private int initTh;
 	private static int MAX_OLD = 5;
 	private static int MAX_HIST = 10000;
+	private static int DECIMALS = -1;
 	private int[] maxlabels;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	//private int nbound = 0;
@@ -49,7 +50,7 @@ public class REBdiscretize extends MOADiscretize {
 		setAttributeIndices("first-last");
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
-		this.initTh = 100;
+		this.initTh = 5000;
 	}
 	
 	public REBdiscretize(int sampleSize, int initTh) {
@@ -111,44 +112,27 @@ public class REBdiscretize extends MOADiscretize {
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-					 if(totalCount == 18817 && i == 2) {
-						 System.err.println("asd");
-					 }
 					 insertExample(i, instance);
-					 checkRangeIntervals();
+					 //if(getMaxHistogram(i) > MAX_HIST + 1)
+						 //System.err.println("ERROR: MAX HISTOGRAM");
 					 
-					 /*nint = 0;
-					 for (int j = 0; j < allIntervals.length; j++) {
-						 nint += allIntervals[j].size() + 1;
-					 }*/
-					 //System.out.println("Number of intervals: " + nint);
-					 //checkGlobalCriterions();
-					 //checkRangeIntervals();
-					 /*if(replacedInstance != null){
-						 long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
-						 deleteExample(i, replacedInstance);
-						 sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
-					 }*/
-						 
-					 /*nint = 0;
-					 for (int j = 0; j < allIntervals.length; j++) {
-						 nint += allIntervals[j].size() + 1;
-					 }
-					 System.out.println("Number of intervals (after removed): " + nint);
-					 checkGlobalCriterions();
-					 checkRangeIntervals();
-					 checkLabelIntervals();*/
-					 //checkIntervalCriterions();
 				 }
 			  }		
+			  addExampleToQueue(instance);
+				 
 			  //replacedInstance = null;
 		  } else {
+			  addExampleToQueue(instance);
 			  batchFusinter(instance);
 			  init = true;
 		  }
+	  } else {
+		  addExampleToQueue(instance);
 	  }
-	  
-	  // Queue new values
+  }
+  
+  private void addExampleToQueue(Instance instance) {
+	// Queue new values
 	  for (int i = 0; i < instance.numAttributes(); i++) {
 			 // if numeric and not missing, discretize
 			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
@@ -156,25 +140,13 @@ public class REBdiscretize extends MOADiscretize {
 						 getInstanceValue(instance.value(i)), (byte)instance.classValue()));
 			 }
 	  }
-	  /*if(totalCount % 101 == 0) {
-		  writeCPointsToFile(1, 2, totalCount, "Reb");
-		  writeDataToFile(1, 2, totalCount);
-	  }*/
   }
   
   
-  private void removeOldsUntilGap(int att, int ngaps, Interval interv) {
-	  int cont = 0;
-	  int oldSize = interv.histogram.size();
-	  while(!elemQ[att].isEmpty() && cont < ngaps) {
-		  Tuple<Float, Byte> elem = elemQ[att].poll();
-		  removePointFromInteravls(att, elem);
-		  if(interv.histogram.size() < oldSize)
-			  cont++;
-		  if(elemQ[att].isEmpty())
-			  System.err.println("error");
-	  }
-	  
+  private void removeOldsUntilSize(int att, Interval interv, int size) {
+	  while(!elemQ[att].isEmpty() && interv.histogram.size() > size) {
+		  removePointFromInteravls(att, elemQ[att].poll());
+	  }	  
   }
   
   private void removeNOlds(int att, int noldies) {
@@ -198,6 +170,17 @@ public class REBdiscretize extends MOADiscretize {
 		  return true;
 	  }
 	  return false;
+  }
+  
+  private int getMaxHistogram(int att) {
+	  int max = 0;
+	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); 
+			  iterator.hasNext();) {
+ 		Interval interv = iterator.next();
+ 		if(max < interv.histogram.size())
+ 			max = interv.histogram.size();
+	  }
+	  return max;
   }
   
   private int getSizeHistograms(int att) {
@@ -327,6 +310,9 @@ public class REBdiscretize extends MOADiscretize {
 			  float oldKey = centralE.getKey();
 			  central.addPoint(att, val, cls); // do not remove any interval from allIntervals, all needed
 			  central.updateCriterion();
+			  // Remove before changing end value in central (DO NOT MOVE FROM HERE)
+			  // This instruction should be between the search of entries and after the addition of the point
+			  allIntervals[att].remove(oldKey);
 			  // Split the interval
 			  //long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 			  Interval splitI = central.splitInterval(att, val); // Criterion is updated for both intervals
@@ -340,8 +326,6 @@ public class REBdiscretize extends MOADiscretize {
 				 allIntervals[att].remove(lowerE.getKey());
 			  }
 			  intervalList.add(central);
-			  // Remove before changing end value in central
-			  allIntervals[att].remove(oldKey);
 			  if(splitI != null)
 				  intervalList.add(splitI); 
 			  if(higherE != null) {
@@ -739,7 +723,10 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private float getInstanceValue(double value) {
-	  //return (float) (Math.round(value * 1000.0) / 1000.0);
+	  if(DECIMALS > 0) {
+		  double mult = Math.pow(10, DECIMALS);
+		  return (float) (Math.round(value * mult) / mult);
+	  }
 	  return (float) value;
   }
   
@@ -814,7 +801,7 @@ public class REBdiscretize extends MOADiscretize {
 			} else {
 				// Make an spot for new points, size limit's been achieved
 				if(histogram.size() > MAX_HIST) {
-					removeOldsUntilGap(att, 1, this);
+					removeOldsUntilSize(att, this, MAX_HIST);
 				}
 				pd = new int[cd.length];
 				pd[cls]++;
@@ -877,7 +864,7 @@ public class REBdiscretize extends MOADiscretize {
 			} else {
 				// Error, no point in this range.
 				System.err.println("Point not found in the given range.");
-				checkUnfoundPoint(att, value);
+				//checkUnfoundPoint(att, value);
 			}
 			// Find a new maximum if the point removed is the maximum
 			if(value == end) {
@@ -902,18 +889,6 @@ public class REBdiscretize extends MOADiscretize {
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
 			
-			/*for (Iterator iterator = histogram.entrySet().iterator(); iterator.hasNext();) {
-				Entry<Float, int[]> entry = (Entry) iterator.next();
-				if(entry.getKey() > value){
-					//histogram.entries().remove(entry);
-					nHist.put(entry.getKey(), entry.getValue());
-					for(int i = 0; i < entry.getValue().length; i++){
-						nCd[i] += entry.getValue()[i];
-						cd[i] -= entry.getValue()[i];
-					}					
-					iterator.remove();
-				}				
-			}*/
 			for (Iterator iterator = histogram.tailMap(value, false).entrySet().iterator(); iterator.hasNext();) {
 				Entry<Float, int[]> entry = (Entry) iterator.next();
 				//histogram.entries().remove(entry);

@@ -61,6 +61,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(25000, true);
+                exp.run(50000, true);
         }
 }

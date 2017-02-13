@@ -88,7 +88,7 @@ public class REBdiscretize extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
-	  if(totalCount % 100000 == 0) {
+	  /*if(totalCount % 100000 == 0) {
 		  //System.out.println("Number of boundaries: " + nbound);
 		  System.out.println("Total boundary evaluation time: " + sumTime);
 		  long totalHistograms = 0;
@@ -100,16 +100,7 @@ public class REBdiscretize extends MOADiscretize {
 			  }
 		  }
 		  System.out.println("Total elems in histograms: " + totalHistograms);
-	  }
-
-	  // Queue new values
-	  for (int i = 0; i < instance.numAttributes(); i++) {
-			 // if numeric and not missing, discretize
-			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-				 elemQ[i].add(new Tuple<Float, Byte>(
-						 getInstanceValue(instance.value(i)), (byte)instance.classValue()));
-			 }
-	  }
+	  }*/
     
 	  // If there are enough instances to initialize cut points, do it!
 	  if(totalCount >= initTh){
@@ -120,7 +111,12 @@ public class REBdiscretize extends MOADiscretize {
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+					 if(totalCount == 18817 && i == 2) {
+						 System.err.println("asd");
+					 }
 					 insertExample(i, instance);
+					 checkRangeIntervals();
+					 
 					 /*nint = 0;
 					 for (int j = 0; j < allIntervals.length; j++) {
 						 nint += allIntervals[j].size() + 1;
@@ -151,6 +147,15 @@ public class REBdiscretize extends MOADiscretize {
 			  init = true;
 		  }
 	  }
+	  
+	  // Queue new values
+	  for (int i = 0; i < instance.numAttributes(); i++) {
+			 // if numeric and not missing, discretize
+			 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+				 elemQ[i].add(new Tuple<Float, Byte>(
+						 getInstanceValue(instance.value(i)), (byte)instance.classValue()));
+			 }
+	  }
 	  /*if(totalCount % 101 == 0) {
 		  writeCPointsToFile(1, 2, totalCount, "Reb");
 		  writeDataToFile(1, 2, totalCount);
@@ -166,6 +171,8 @@ public class REBdiscretize extends MOADiscretize {
 		  removePointFromInteravls(att, elem);
 		  if(interv.histogram.size() < oldSize)
 			  cont++;
+		  if(elemQ[att].isEmpty())
+			  System.err.println("error");
 	  }
 	  
   }
@@ -293,6 +300,18 @@ public class REBdiscretize extends MOADiscretize {
 	  return lowth;
   }
   
+  private boolean equalLabels(List<Interval> l) {
+	  HashSet<Integer> labels = new HashSet<Integer>();
+	  for (Iterator iterator = l.iterator(); iterator.hasNext();) {
+		Interval interval = (Interval) iterator.next();
+		if(labels.contains(interval.label))
+			return true;
+		else
+			labels.add(interval.label);
+	}
+	return false;
+  }
+  
   private void insertExample(int att, Instance instance){
   	 // INSERTION
      int cls = (int) instance.classValue();
@@ -303,20 +322,17 @@ public class REBdiscretize extends MOADiscretize {
 	 if(centralE != null) {
 		 Interval central = centralE.getValue();
 		 // If it is a boundary point, evaluate six different cutting alternatives
-		 if(isBoundary(att, central, val, cls)){
-			  //nbound++;
-		 //if(true){
-			  // Remove before changing end value in central
-			  allIntervals[att].remove(centralE.getKey());
+		 if(isBoundary(att, central, val, cls)){			  
 			  // Add splitting point before dividing the interval
-			  central.addPoint(att, val, cls);
+			  float oldKey = centralE.getKey();
+			  central.addPoint(att, val, cls); // do not remove any interval from allIntervals, all needed
 			  central.updateCriterion();
 			  // Split the interval
 			  //long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 			  Interval splitI = central.splitInterval(att, val); // Criterion is updated for both intervals
 			  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
 			  Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
-			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
+			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(splitI.end); // if not use splitI, we will take again central
 			  LinkedList<Interval> intervalList = new LinkedList<Interval>();
 			  // Insert in the specific order
 			  if(lowerE != null) {
@@ -324,13 +340,14 @@ public class REBdiscretize extends MOADiscretize {
 				 allIntervals[att].remove(lowerE.getKey());
 			  }
 			  intervalList.add(central);
+			  // Remove before changing end value in central
+			  allIntervals[att].remove(oldKey);
 			  if(splitI != null)
 				  intervalList.add(splitI); 
 			  if(higherE != null) {
 				  intervalList.add(higherE.getValue());
 				  allIntervals[att].remove(higherE.getKey());
 			  }
-			  
 			  evaluateLocalMerges(att, intervalList);
 			  insertIntervals(att, intervalList);
 		 } else {
@@ -726,7 +743,7 @@ public class REBdiscretize extends MOADiscretize {
 	  return (float) value;
   }
   
-  private int getLabel(int att){ 
+  private int getLabel(int att){
 	  maxlabels[att]++;
 	  return maxlabels[att] - 1;
   }

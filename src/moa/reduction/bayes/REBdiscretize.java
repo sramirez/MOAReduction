@@ -33,17 +33,15 @@ public class REBdiscretize extends MOADiscretize {
 	TreeMap<Float, Interval>[] allIntervals;
 	//Instance[] sample;
 	boolean init = false;
-	private long seed = 317901561;
 	private float lambda, alpha;
 	private int initTh;
 	private static int MAX_OLD = 5;
-	private static int MAX_HIST = 10000;
-	private static int DECIMALS = -1;
+	private int maxHist;
+	private int decimals;
 	private int[] maxlabels;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	//private int nbound = 0;
-	
-	private double sumTime = 0;
+	//private double sumTime = 0;
 	
 	public REBdiscretize() {
 		// TODO Auto-generated constructor stub
@@ -51,12 +49,16 @@ public class REBdiscretize extends MOADiscretize {
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
 		this.initTh = 5000;
+		this.maxHist = 10000;
+		this.decimals = 0;
 	}
 	
-	public REBdiscretize(int sampleSize, int initTh) {
+	public REBdiscretize(int maxhist, int initTh, int decimals) {
 		// TODO Auto-generated constructor stub
 		this();
 		this.initTh = initTh;
+		this.decimals = decimals;
+		this.maxHist = maxhist;		
 	}	
 
 
@@ -302,6 +304,7 @@ public class REBdiscretize extends MOADiscretize {
 	 // Get the ceiling interval for the given value
 	 Map.Entry<Float, Interval> centralE = allIntervals[att].ceilingEntry(val);
 	 // The point is within the range defined by centralE, if not a new maximum interval is created
+	 LinkedList<Interval> intervalList = new LinkedList<Interval>();
 	 if(centralE != null) {
 		 Interval central = centralE.getValue();
 		 // If it is a boundary point, evaluate six different cutting alternatives
@@ -319,7 +322,6 @@ public class REBdiscretize extends MOADiscretize {
 			  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
 			  Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
 			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(splitI.end); // if not use splitI, we will take again central
-			  LinkedList<Interval> intervalList = new LinkedList<Interval>();
 			  // Insert in the specific order
 			  if(lowerE != null) {
 				 intervalList.add(lowerE.getValue());
@@ -342,12 +344,12 @@ public class REBdiscretize extends MOADiscretize {
 			 if(centralE.getKey() != central.end) {
 				 allIntervals[att].remove(centralE.getKey());
 				 allIntervals[att].put(central.end, central);
-			 }						  
+			 }
+			 intervalList.add(central);
 		 }
 	 } else {
 		 // New interval with a new maximum limit
 		 Map.Entry<Float, Interval> priorE = allIntervals[att].lowerEntry(val);
-		  LinkedList<Interval> intervalList = new LinkedList<Interval>();
 		 // Insert in the specific order
 		 if(priorE != null) {
 			 intervalList.add(priorE.getValue());
@@ -358,8 +360,16 @@ public class REBdiscretize extends MOADiscretize {
 		 intervalList.add(nInt);
 		 evaluateLocalMerges(att, intervalList);
 		 insertIntervals(att, intervalList);
-		 //allIntervals[att].put(val, nInt);
 	 }
+	 
+	 // Make an spot for new points, size limit's been achieved
+	 for (Iterator iterator = intervalList.iterator(); iterator.hasNext();) {
+		Interval interval = (Interval) iterator.next();
+		if(interval.histogram.size() > maxHist) {
+			removeOldsUntilSize(att, interval, maxHist);
+		}
+	 }
+		
   }
   
   private void deleteExample(int att, Instance instance) {
@@ -628,7 +638,7 @@ public class REBdiscretize extends MOADiscretize {
 			//globalCrits[att] = maxGlobalCrit;
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
-			int oldlab = int1.mergeIntervals(int2);
+			int1.mergeIntervals(int2);
 		} else {
 			break;
 		}
@@ -723,8 +733,8 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private float getInstanceValue(double value) {
-	  if(DECIMALS > 0) {
-		  double mult = Math.pow(10, DECIMALS);
+	  if(decimals > 0) {
+		  double mult = Math.pow(10, decimals);
 		  return (float) (Math.round(value * mult) / mult);
 	  }
 	  return (float) value;
@@ -798,11 +808,7 @@ public class REBdiscretize extends MOADiscretize {
 			int[] pd = histogram.get(value);
 			if(pd != null) {
 				pd[cls]++;
-			} else {
-				// Make an spot for new points, size limit's been achieved
-				if(histogram.size() > MAX_HIST) {
-					removeOldsUntilSize(att, this, MAX_HIST);
-				}
+			} else {				
 				pd = new int[cd.length];
 				pd[cls]++;
 				histogram.put(value, pd);

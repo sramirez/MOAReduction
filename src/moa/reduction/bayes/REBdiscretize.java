@@ -40,7 +40,6 @@ public class REBdiscretize extends MOADiscretize {
 	private int decimals;
 	private int[] maxlabels;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
-	//private int nbound = 0;
 	//private double sumTime = 0;
 	
 	public REBdiscretize() {
@@ -76,25 +75,28 @@ public class REBdiscretize extends MOADiscretize {
 				 		labels[j] = Integer.toString(interv.label);
 				 		boundaries[j++] = interv.end;
 				 	}
-				 	m_Labels[i] = labels;
+				 	//m_Labels[i] = labels;
 				 	m_CutPoints[i] = boundaries;
 				 }
 			  }		  
 			  return convertInstance(inst);
-		  }		  
+		  }			
 		  return inst;
 	}
   
   public void updateEvaluator(Instance instance) {	  
+		 
+		
+	  
 	  if(m_CutPoints == null) {
 		  initializeLayers(instance);
 	  }
 	  
 	  totalCount++;
-	  /*if(totalCount % 100000 == 0) {
-		  //System.out.println("Number of boundaries: " + nbound);
-		  System.out.println("Total boundary evaluation time: " + sumTime);
-		  long totalHistograms = 0;
+	  /*if(totalCount % 50000 == 0) {
+		  System.out.println("Number of boundaries: " + nbound);
+		  //System.out.println("Total boundary evaluation time: " + sumTime);
+		 long totalHistograms = 0;
 		  for(int i = 0; i < numAttributes; i++){
 			  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
 			 			.hasNext();) {
@@ -114,18 +116,20 @@ public class REBdiscretize extends MOADiscretize {
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-					 insertExample(i, instance);
+					 insertExample(i, instance); 
+					  
+					 //insertExample(i, instance);
 					 //if(getMaxHistogram(i) > MAX_HIST + 1)
 						 //System.err.println("ERROR: MAX HISTOGRAM");
 					 
 				 }
 			  }		
-			  addExampleToQueue(instance);
-				 
+			  addExampleToQueue(instance); 
 			  //replacedInstance = null;
 		  } else {
 			  addExampleToQueue(instance);
 			  batchFusinter(instance);
+			  	
 			  init = true;
 		  }
 	  } else {
@@ -308,7 +312,7 @@ public class REBdiscretize extends MOADiscretize {
 	 if(centralE != null) {
 		 Interval central = centralE.getValue();
 		 // If it is a boundary point, evaluate six different cutting alternatives
-		 if(isBoundary(att, central, val, cls)){			  
+		 if(isBoundary(att, central, val, cls)){ 
 			  // Add splitting point before dividing the interval
 			  float oldKey = centralE.getKey();
 			  central.addPoint(att, val, cls); // do not remove any interval from allIntervals, all needed
@@ -317,9 +321,7 @@ public class REBdiscretize extends MOADiscretize {
 			  // This instruction should be between the search of entries and after the addition of the point
 			  allIntervals[att].remove(oldKey);
 			  // Split the interval
-			  //long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 			  Interval splitI = central.splitInterval(att, val); // Criterion is updated for both intervals
-			  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
 			  Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
 			  Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(splitI.end); // if not use splitI, we will take again central
 			  // Insert in the specific order
@@ -518,6 +520,7 @@ public class REBdiscretize extends MOADiscretize {
 		  } else {
 			  // If the point already exists before, evaluate if it is now a boundary
 			  if(following.getKey() == value) {
+				  
 				  Entry<Float, int[]> nextnext = ceiling.histogram.higherEntry(value);
 				  if(nextnext != null) {
 					  int[] cd1 = following.getValue();				  
@@ -731,7 +734,7 @@ public class REBdiscretize extends MOADiscretize {
 	  numAttributes = inst.numAttributes();
 	  allIntervals = new TreeMap[numAttributes];
 	  m_CutPoints = new double[numAttributes][];
-	  m_Labels = new String[numAttributes][];
+	  //m_Labels = new String[numAttributes][];
 	  elemQ = new LinkedList[numAttributes];
 	  maxlabels = new int[numAttributes];
 	  

@@ -567,11 +567,21 @@ public class REBdiscretize extends MOADiscretize {
   private void batchFusinter(Instance model) {
 	  // TODO Auto-generated method stub
 	  float[][] sorted = new float[numAttributes][];
-	  final int[] classData = new int[elemQ[0].size()];
 	  int nvalid = 0;
-	  // && elemQ[0].get(j) != null
-	  for (int j = 0; j < elemQ[0].size(); j++) {
-		  classData[j] = elemQ[0].get(j).y;
+	  LinkedList<Tuple<Float, Byte>> relem = null;
+	  for (int i = 0; i < elemQ.length; i++) {
+		  if(!elemQ[i].isEmpty()){
+			  relem = elemQ[i];
+			  break;
+		  }			  
+	  }
+	  
+	  if(relem == null)
+		  System.err.println("Error: No numerical attribute in the dataset.");
+
+	  final int[] classData = new int[relem.size()];
+	  for (int j = 0; j < relem.size(); j++) {
+		  classData[j] = relem.get(j).y;
 		  nvalid++;
 	  }
 	  

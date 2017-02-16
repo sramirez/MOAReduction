@@ -38,8 +38,10 @@ public class REBdiscretize extends MOADiscretize {
 	private static int MAX_OLD = 5;
 	private int maxHist;
 	private int decimals;
-	private int[] maxlabels;
+	private Queue<Integer>[] labelsToUse;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
+	private int maxLabels = 1000;
+	private int[] contLabels;
 	//private double sumTime = 0;
 	
 	public REBdiscretize() {
@@ -52,12 +54,13 @@ public class REBdiscretize extends MOADiscretize {
 		this.decimals = 0;
 	}
 	
-	public REBdiscretize(int maxhist, int initTh, int decimals) {
+	public REBdiscretize(int maxhist, int initTh, int decimals, int maxLabels) {
 		// TODO Auto-generated constructor stub
 		this();
 		this.initTh = initTh;
 		this.decimals = decimals;
 		this.maxHist = maxhist;		
+		this.maxLabels = maxLabels;
 	}	
 
 
@@ -75,7 +78,7 @@ public class REBdiscretize extends MOADiscretize {
 				 		labels[j] = Integer.toString(interv.label);
 				 		boundaries[j++] = interv.end;
 				 	}
-				 	//m_Labels[i] = labels;
+				 	m_Labels[i] = labels;
 				 	m_CutPoints[i] = boundaries;
 				 }
 			  }		  
@@ -172,6 +175,7 @@ public class REBdiscretize extends MOADiscretize {
 		  // If interval is empty, remove it from the list
 		  if(ceilingE.getValue().histogram.isEmpty()) {
 			  allIntervals[att].remove(ceilingE.getKey());
+			  labelsToUse[att].add(ceilingE.getValue().label);
 		  }
 		  return true;
 	  }
@@ -651,7 +655,8 @@ public class REBdiscretize extends MOADiscretize {
 			//globalCrits[att] = maxGlobalCrit;
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
-			int1.mergeIntervals(int2);
+			int oldLabel = int1.mergeIntervals(int2);
+			labelsToUse[att].add(oldLabel);
 		} else {
 			break;
 		}
@@ -734,14 +739,19 @@ public class REBdiscretize extends MOADiscretize {
 	  numAttributes = inst.numAttributes();
 	  allIntervals = new TreeMap[numAttributes];
 	  m_CutPoints = new double[numAttributes][];
-	  //m_Labels = new String[numAttributes][];
+	  m_Labels = new String[numAttributes][];
 	  elemQ = new LinkedList[numAttributes];
-	  maxlabels = new int[numAttributes];
+	  labelsToUse = new Queue[numAttributes];
+	  contLabels = new int[numAttributes];
 	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
-		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();	
-		  maxlabels[i] = 1;
+		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();
+		  labelsToUse[i] = new LinkedList<Integer>();
+		  contLabels[i] = maxLabels;
+		  for (int j = 1; j < maxLabels + 1; j++) {
+				labelsToUse[i].add(j);
+		  }
 	  }  
   }
   
@@ -754,8 +764,9 @@ public class REBdiscretize extends MOADiscretize {
   }
   
   private int getLabel(int att){
-	  maxlabels[att]++;
-	  return maxlabels[att] - 1;
+	  if(labelsToUse[att].isEmpty())
+		  return ++contLabels[att];
+	  return labelsToUse[att].poll();
   }
 	
 	class Interval {

@@ -83,7 +83,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 3, 0, 5);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 5, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 5000, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
@@ -91,7 +91,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption decimalsOption = new IntOption("decimals", 'e', 
     		"Number of decimals to round", 3, 0, Integer.MAX_VALUE); 
     public static IntOption maxLabelsOption = new IntOption("maxLabels", 'l', 
-    		"Number of different labels to use in discretization", 100, 10, Integer.MAX_VALUE); 
+    		"Number of different labels to use in discretization", 10000, 10, Integer.MAX_VALUE); 
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
     		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
     

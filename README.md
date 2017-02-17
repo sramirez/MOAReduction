@@ -20,6 +20,14 @@ You can also unzip MOA's any of the JAR files, add the source code for the algor
 
 Requirements: Java 8 and MOA (v2016.04).
 
+## Associated publication
+
+Sergio Ramírez-Gallego, Bartosz Krawczyk, Salvador García, Michał Woźniak, Francisco Herrera, *A survey on Data Preprocessing for Data Stream Mining: Current status and future directions*, Neurocomputing, Available online 14 February 2017, ISSN 0925-2312, http://dx.doi.org/10.1016/j.neucom.2017.01.078.
+(http://www.sciencedirect.com/science/article/pii/S0925231217302631)
+
+Abstract: Abstract
+Data preprocessing and reduction have become essential techniques in current knowledge discovery scenarios, dominated by increasingly large datasets. These methods aim at reducing the complexity inherent to real-world datasets, so that they can be easily processed by current data mining solutions. Advantages of such approaches include, among others, a faster and more precise learning process, and more understandable structure of raw data. However, in the context of data preprocessing techniques for data streams have a long road ahead of them, despite online learning is growing in importance thanks to the development of Internet and technologies for massive data collection. Throughout this survey, we summarize, categorize and analyze those contributions on data preprocessing that cope with streaming data. This work also takes into account the existing relationships between the different families of methods (feature and instance selection, and discretization). To enrich our study, we conduct thorough experiments using the most relevant contributions and present an analysis of their predictive performance, reduction rates, computational time, and memory usage. Finally, we offer general advices about existing data stream preprocessing algorithms, as well as discuss emerging future challenges to be faced in the domain of data stream preprocessing.
+
 ## Documentation
 
 ### Instance Selection

@@ -7,23 +7,29 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 
-import moa.core.TimingUtils;
 import moa.reduction.core.MOADiscretize;
 
 import com.yahoo.labs.samoa.instances.Instance;
 
-public class REBdiscretize extends MOADiscretize {
+/**
+ * Local Fusion Online Discretizer<br/>
+ * <br/>
+ * <br/>
+ * An online discretizer that fuse intervals locally using a measure based on quadratic entropy.<br/>
+ * <p/>
+ * 
+ * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
+ */
+
+public class LFODiscretizer extends MOADiscretize {
 	
 	/**
 	 * 
@@ -31,39 +37,54 @@ public class REBdiscretize extends MOADiscretize {
 	private static final long serialVersionUID = 1L;
 	private int totalCount, numClasses, numAttributes;
 	TreeMap<Float, Interval>[] allIntervals;
-	//Instance[] sample;
 	boolean init = false;
 	private float lambda, alpha;
 	private int initTh;
 	private static int MAX_OLD = 5;
 	private int maxHist;
 	private int decimals;
+	// Queu of labels for each attribute
 	private Queue<Integer>[] labelsToUse;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
-	private int maxLabels = 1000;
+	private int maxLabels;
 	private int[] contLabels;
-	//private double sumTime = 0;
 	
-	public REBdiscretize() {
+	/**
+	 * Default constructor. Parameters has been set to 
+	 * the best configuration according to the authors.
+	 */
+	public LFODiscretizer() {
 		// TODO Auto-generated constructor stub
 		setAttributeIndices("first-last");
 		this.alpha = 0.5f;
 		this.lambda = 0.5f;
 		this.initTh = 5000;
 		this.maxHist = 10000;
-		this.decimals = 0;
+		this.decimals = 3;
+		this.maxLabels = 1000;
 	}
 	
-	public REBdiscretize(int maxhist, int initTh, int decimals, int maxLabels) {
-		// TODO Auto-generated constructor stub
+	/**
+	 * Second constructor. It allows to change the values of the user-defined parameters.
+	 * @param maxhist Maximum number of elements in each histogram inside intervals.
+	 * @param initTh Initial threshold which determines the number of instance before generating the first intervals.
+	 * @param decimals Number of decimals used to round points.
+	 * @param maxLabels Maximum number of labels to used in queues.
+	 */
+	public LFODiscretizer(int maxhist, int initTh, int decimals, int maxLabels) {
 		this();
 		this.initTh = initTh;
 		this.decimals = decimals;
 		this.maxHist = maxhist;		
 		this.maxLabels = maxLabels;
-	}	
+	}
 
-
+	/**
+	 * Apply the discretization scheme to a new incoming instance.
+	 * The discretization scheme must be generated previously.
+	 * @param inst a new instance.
+	 * @return A new instance discretized.
+	 */
 	public Instance applyDiscretization(Instance inst) {
 		  if(init){
 			  for (int i = 0; i < inst.numAttributes(); i++) {
@@ -87,48 +108,27 @@ public class REBdiscretize extends MOADiscretize {
 		  return inst;
 	}
   
-  public void updateEvaluator(Instance instance) {	  
-		 
-		
+	/**
+	 *  Update the discretization scheme.
+	 *  @param instance an incoming instance.
+	 */
+  public void updateEvaluator(Instance instance) {
 	  
 	  if(m_CutPoints == null) {
 		  initializeLayers(instance);
 	  }
 	  
 	  totalCount++;
-	  /*if(totalCount % 50000 == 0) {
-		  System.out.println("Number of boundaries: " + nbound);
-		  //System.out.println("Total boundary evaluation time: " + sumTime);
-		 long totalHistograms = 0;
-		  for(int i = 0; i < numAttributes; i++){
-			  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-			 			.hasNext();) {
-		 		Interval interv = iterator.next();
-		 		totalHistograms += interv.histogram.size();
-			  }
-		  }
-		  System.out.println("Total elems in histograms: " + totalHistograms);
-	  }*/
     
 	  // If there are enough instances to initialize cut points, do it!
 	  if(totalCount >= initTh){
-		  if(init) {
-			  //System.out.println("Total count: " + totalCount);
-			  //System.out.println("Number of elems in histograms: " + getSizeHistograms(1));
-			  
+		  if(init) {			  
 			  for (int i = 0; i < instance.numAttributes(); i++) {
-				 // if numeric and not missing, discretize
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
-					 insertExample(i, instance); 
-					  
-					 //insertExample(i, instance);
-					 //if(getMaxHistogram(i) > MAX_HIST + 1)
-						 //System.err.println("ERROR: MAX HISTOGRAM");
-					 
+					 insertExample(i, instance); 					 
 				 }
 			  }		
-			  addExampleToQueue(instance); 
-			  //replacedInstance = null;
+			  addExampleToQueue(instance);
 		  } else {
 			  addExampleToQueue(instance);
 			  batchFusinter(instance);
@@ -140,6 +140,11 @@ public class REBdiscretize extends MOADiscretize {
 	  }
   }
   
+  /**
+   * Add values to the queues (by attribute). In this way, points are ordered by timestamp and
+   * can be removed safely.
+   * @param instance an incoming isntance.
+   */
   private void addExampleToQueue(Instance instance) {
 	// Queue new values
 	  for (int i = 0; i < instance.numAttributes(); i++) {
@@ -151,23 +156,24 @@ public class REBdiscretize extends MOADiscretize {
 	  }
   }
   
-  
+  /**
+   * Remove points from the queue till enough room is left for new points.
+   * @param att Attribute index
+   * @param interv Interval that needs exta space in its histogram.
+   * @param size Number of spaces to free.
+   */
   private void removeOldsUntilSize(int att, Interval interv, int size) {
 	  while(!elemQ[att].isEmpty() && interv.histogram.size() > size) {
 		  removePointFromInteravls(att, elemQ[att].poll());
 	  }	  
   }
   
-  private void removeNOlds(int att, int noldies) {
-	  int cont = 0;
-	  while(!elemQ[att].isEmpty() && cont < noldies) {
-		  Tuple<Float, Byte> elem = elemQ[att].poll();
-		  if(removePointFromInteravls(att, elem))
-			  cont++;
-	  }
-	  
-  }
-  
+  /**
+   * Remove a point from the set of intervals in an attribute.
+   * @param att Attribute index
+   * @param elem Class and value of the point
+   * @return if removal is performed
+   */
   private boolean removePointFromInteravls(int att, Tuple<Float, Byte> elem) {
 	  Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(elem.x);
 	  if(ceilingE != null){
@@ -182,131 +188,15 @@ public class REBdiscretize extends MOADiscretize {
 	  return false;
   }
   
-  private int getMaxHistogram(int att) {
-	  int max = 0;
-	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); 
-			  iterator.hasNext();) {
- 		Interval interv = iterator.next();
- 		if(max < interv.histogram.size())
- 			max = interv.histogram.size();
-	  }
-	  return max;
-  }
-  
-  private int getSizeHistograms(int att) {
-	  int total = 0;
-	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); iterator
-	 			.hasNext();) {
- 		Interval interv = iterator.next();
- 		for (Iterator iterator2 = interv.histogram.entrySet().iterator(); iterator2.hasNext();) {
-			Entry<Float, int[]> entry = (Entry) iterator2.next();
-			int[] cd = entry.getValue();
-			for(int i = 0; i < cd.length; i++)
-				total += cd[i];
-		}
-	  }
-	  return total;
-  }
-  
-  private void checkIntervalCriterions(){
-	  for(int i = 0; i < numAttributes; i++){
-		  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-		 			.hasNext();) {
-	 		Interval interv = iterator.next();
-	 		if(interv.crit < 0)
-	 			System.err.println("asd");
-		  }
-	  }	 
-  }
-  
-  private boolean checkRangeIntervals(){
-	  for(int i = 0; i < numAttributes; i++){
-		  for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-		 			.hasNext();) {
-	 		Interval interv = iterator.next();
-	 		for (Iterator iterator2 = interv.histogram.entrySet().iterator(); iterator2.hasNext();) {
-				Entry<Float, int[]> entry = (Entry) iterator2.next();
-				if(entry.getKey() > interv.end){
-					System.err.println("Error in checkRangeIntervals");
-					return false;
-				}					
-			}
-		  }
-	  }	  
-	  return true;
-  }
-
-  private void checkHistogramIntervals(Interval interval){
-	  	int s1 = 0, total1 = 0;
-		for (int i = 0; i < interval.cd.length; i++) {
-			s1 += interval.cd[i];
-		}
-		
-		for (Iterator iterator = interval.histogram.entrySet().iterator(); iterator.hasNext();) {
-			Entry<Float, int[]> entry = (Entry) iterator.next();
-			int[] v = entry.getValue();
-			for (int i = 0; i < v.length; i++) {
-				total1 += v[i];
-			}
-		}
-		if(s1 != total1)
-			System.err.println("Error in checkHistogramIntervals");
-  }
-  
-  private void checkLabelIntervals(){
-	 for (int i = 0; i < numAttributes; i++) {
-		 Set<Integer> labels2 = new HashSet<Integer>();
-		 for (Iterator<Interval> iterator = allIntervals[i].values().iterator(); iterator
-	 			.hasNext();) {
-	 		Interval interv = iterator.next();
-	 		
-	 		if(labels2.contains(interv.label))
-				System.err.println("Error in checkLabelIntervals");
-			labels2.add(interv.label);
-
-	 	}
-	 }
-  }
-  
-  private float lowConfidenceTh(Collection<Interval> intervals, float mult) {
-	  
-	  int n = intervals.size();
-	  float lowth = Float.POSITIVE_INFINITY;
-	  if(n > 1) {
-
-		  float[] v = new float[n];
-		  float avg = 0, sd = 0;
-		  int i = 0;
-		  for (Iterator<Interval> iterator = intervals.iterator(); 
-				  iterator.hasNext();) {
-		 		Interval interv = iterator.next();
-		 		avg += interv.crit;
-		 		v[i++] = interv.crit;
-		  }
-		  avg /= n;
-		  for (int j = 0; j < v.length; j++) {
-			  sd += Math.pow(v[j] - avg, 2);
-		  }
-		  sd = (float) Math.sqrt(sd) / n;	  
-		  lowth = avg - mult * sd;  
-	  }
-	  return lowth;
-  }
-  
-  private boolean equalLabels(List<Interval> l) {
-	  HashSet<Integer> labels = new HashSet<Integer>();
-	  for (Iterator iterator = l.iterator(); iterator.hasNext();) {
-		Interval interval = (Interval) iterator.next();
-		if(labels.contains(interval.label))
-			return true;
-		else
-			labels.add(interval.label);
-	}
-	return false;
-  }
-  
+  /**
+   * Insert a new example in the discretization scheme. If it is a boundary point,
+   * it is incorporated and a local fusion process is launched using this interval and 
+   * the surrounding ones. If not, the point just feed up the intervals.
+   * @param att Attribute index
+   * @param instance An incoming example
+   */
   private void insertExample(int att, Instance instance){
-  	 // INSERTION
+	  
      int cls = (int) instance.classValue();
      float val = getInstanceValue(instance.value(att));
 	 // Get the ceiling interval for the given value
@@ -321,7 +211,6 @@ public class REBdiscretize extends MOADiscretize {
 			  float oldKey = centralE.getKey();
 			  central.addPoint(att, val, cls); // do not remove any interval from allIntervals, all needed
 			  central.updateCriterion();
-			  // Remove before changing end value in central (DO NOT MOVE FROM HERE)
 			  // This instruction should be between the search of entries and after the addition of the point
 			  allIntervals[att].remove(oldKey);
 			  // Split the interval
@@ -369,7 +258,7 @@ public class REBdiscretize extends MOADiscretize {
 	 }
 	 
 	 // Make an spot for new points, size limit's been achieved
-	 for (Iterator iterator = intervalList.iterator(); iterator.hasNext();) {
+	 for (Iterator<Interval> iterator = intervalList.iterator(); iterator.hasNext();) {
 		Interval interval = (Interval) iterator.next();
 		if(interval.histogram.size() > maxHist) {
 			removeOldsUntilSize(att, interval, maxHist);
@@ -378,76 +267,20 @@ public class REBdiscretize extends MOADiscretize {
 		
   }
   
-  private void deleteExample(int att, Instance instance) {
-	 int cls = (int) instance.classValue();
-	 float val = getInstanceValue(instance.value(att));
-	 // Find the interval containing the point to be removed
-	 Map.Entry<Float, Interval> ceilingE = allIntervals[att].ceilingEntry(val);
-	 if(ceilingE != null){ // The point must be contained in any previously inserted interval
-		 Interval central = ceilingE.getValue();
-		 Map.Entry<Float, Interval> lowerE = allIntervals[att].lowerEntry(central.end);
-		 Map.Entry<Float, Interval> higherE = allIntervals[att].higherEntry(central.end);
-		 // Delete surrounding interval before starting
-		 LinkedList<Interval> intervalList = new LinkedList<Interval>();
-		 //int ninterv = allIntervals[att].size();
-		 if(lowerE != null) {					 
-			 intervalList.add(lowerE.getValue());
-			 allIntervals[att].remove(lowerE.getKey());
-		 }
-		 if(central != null){					 
-			 intervalList.add(central);
-			 allIntervals[att].remove(ceilingE.getKey());
-		 }
-		 if(higherE != null) {					 
-			 intervalList.add(higherE.getValue());
-			 allIntervals[att].remove(higherE.getKey());
-		 }
-		 
-		 // Get the new interval from the splitting to test (if it is not the last interval and point)
-		 //if(allIntervals[att].size() > 1 && central.histogram.size() > 1) {
-			 // remove before changing end value in central
-			 central.removePoint(att, val, cls);
-			 central.updateCriterion();
-		 //}
-		 Interval splittedInterval = null;
-		 // If central is empty, so we merge it with its prior interval or we just remove it
-		 if(central.histogram.isEmpty()){
-			 intervalList.remove(central);
-			 /*if(lowerE != null) {
-				 int oldlab = lowerE.getValue().mergeIntervals(central);
-				 labelsToUse[att].add(oldlab);
-			 }*/// else {
-				 // Just remove central from map
-				 //allIntervals[i].remove(central.end);
-			 //}
-			 central = null;
-		 } else {
-			 splittedInterval = central.splitByPrevMerge(att);
-		 }
-		 // Get the surrounding intervals around the chosen interval
-		 intervalList = new LinkedList<Interval>();
-		 if(lowerE != null)
-			 intervalList.add(lowerE.getValue());
-		 if(central != null)
-			 intervalList.add(central);
-		 if(splittedInterval != null) 
-			 intervalList.add(splittedInterval); 
-		 if(higherE != null)
-			 intervalList.add(higherE.getValue());				 
-		 // Evaluate changes in class distributions (allIntervals is updated)
-		 evaluateLocalMerges(att, intervalList);		
-		 insertIntervals(att, intervalList);
-	 }
-  }
-  
+  /**
+   * Write discretization points in this iteration (for two attributes) to file.
+   * @param att1 Attribute index for first attribute.
+   * @param att2 Attribute index for second attribute.
+   * @param iteration Iteration ID
+   */
   private void writeDataToFile(int att1, int att2, int iteration){
 	  FileWriter data = null;
-		try {
+	  try {
 			data = new FileWriter("Reb-data" + "-" + iteration + ".dat");
-		} catch (IOException e) {
+	  } catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+	  }
 	  PrintWriter dataout = new PrintWriter(data);
 	  
 	  for (int i = 0; i < elemQ.length; i++) {
@@ -471,28 +304,11 @@ public class REBdiscretize extends MOADiscretize {
 	  
   }
   
-  private boolean checkUnfoundPoint(int att, float value) {
-	  boolean found = false;
-	  for (Iterator<Interval> iterator = allIntervals[att].values().iterator(); iterator.hasNext();) {
-			Interval interval = iterator.next();
-			if(interval.histogram.containsKey(value)){
-				found = true;
-			}	
-	  }
-	  if(!found)
-		  System.err.println("Not found");
-	  return found;
-  }
-  
-  private void deleteSurroundingIntervals(int att, LinkedList<Interval> intervalList){
-	// Delete old intervals
-	  for (Iterator<Interval> iterator = intervalList.iterator(); iterator.hasNext();) {
-		Interval interval = iterator.next();
-		if(interval != null)
-			allIntervals[att].remove(interval.end);
-	  }
-  }
-  
+  /**
+   * Insert intervals in the global list of intervals.
+   * @param att Attribute index
+   * @param intervalList List of intervals to insert.
+   */
   private void insertIntervals(int att, LinkedList<Interval> intervalList){
 	  for (Iterator<Interval> iterator = intervalList.iterator(); iterator
 				.hasNext();) {
@@ -503,6 +319,15 @@ public class REBdiscretize extends MOADiscretize {
 	  
   }
   
+  /**
+   * Check if a point is boundary by firstly inspecting the closest interval to this point, 
+   * and then by checking the next entry in the histogram. 
+   * @param att Attribute index
+   * @param ceiling The closest interval to the point.
+   * @param value Point value
+   * @param clas Class value
+   * @return True if it is boundary, false otherwise.
+   */
   private boolean isBoundary(int att, Interval ceiling, float value, int clas){
 	        
 	  boolean boundary = false;
@@ -547,6 +372,12 @@ public class REBdiscretize extends MOADiscretize {
 	 
   }
   
+  /**
+   * Check histograms to assert the boundary condition.
+   * @param cd1 Class histogram for point one.
+   * @param cd2 Class histogram for point two.
+   * @return @return True if it is boundary, false otherwise.
+   */
   private boolean isBoundary(int[] cd1, int[] cd2){
 	  int count = 0;
 	  for (int i = 0; i < cd1.length; i++) {
@@ -559,6 +390,11 @@ public class REBdiscretize extends MOADiscretize {
 	  return false;
   }
   
+  /**
+   * Print basic information about a list of intervals
+   * @param att Attribute index
+   * @param intervals List of intervals
+   */
   private void printIntervals(int att, Collection<Interval> intervals){
 	  System.out.println("Atributo: " + att);
 	  int sum = 0;
@@ -571,8 +407,12 @@ public class REBdiscretize extends MOADiscretize {
 	  }	  
   }
   
+  /**
+   * Apply standard FUSINTER to the first batch of examples. Then the discretization scheme
+   * is initialized to apply further local changes.
+   * @param model An example from this batch.
+   */
   private void batchFusinter(Instance model) {
-	  // TODO Auto-generated method stub
 	  float[][] sorted = new float[numAttributes][];
 	  int nvalid = 0;
 	  LinkedList<Tuple<Float, Byte>> relem = null;
@@ -629,15 +469,12 @@ public class REBdiscretize extends MOADiscretize {
 	  }
   }
   
+  /**
+   * Apply local merges to a list of intervals until no more improvements can be obtained.
+   * @param att Attribute index
+   * @param intervalList List of intervals to merge
+   */
   private void evaluateLocalMerges(int att, List<Interval> intervalList) {
-	
-	HashSet<Integer> unchangedIntervals = new HashSet<Integer>();
-	ArrayList<Integer> indices = new ArrayList<Integer>();
-	
-	for (int i = 0; i < intervalList.size(); i++) {
-		unchangedIntervals.add(i);
-		indices.add(i);		
-	}
 	
 	while(intervalList.size() > 1) {
 		float globalDiff = 0;
@@ -652,7 +489,6 @@ public class REBdiscretize extends MOADiscretize {
 		}
 	
 		if(globalDiff > 0) {
-			//globalCrits[att] = maxGlobalCrit;
 			Interval int1 = intervalList.get(posMin);
 			Interval int2 = intervalList.remove(posMin+1);
 			int oldLabel = int1.mergeIntervals(int2);
@@ -664,6 +500,12 @@ public class REBdiscretize extends MOADiscretize {
 	
   }
   
+  /**
+   * Evaluate a merge using both class histograms and the quadratic entropy measure.
+   * @param cd1 Class histogram #1
+   * @param cd2 Class histogram #2
+   * @return Criterion value in case we merge both intervals.
+   */
   private float evaluteMerge(int[] cd1, int[] cd2) {
 	  int[] cds = cd1.clone();
 	  for (int i = 0; i < cds.length; i++) {
@@ -672,6 +514,11 @@ public class REBdiscretize extends MOADiscretize {
 	  return  evalInterval(cds);
   }
 	
+  	/**
+  	 * Quadratic entropy value for this interval.
+  	 * @param cd Class histogram for this interval.
+  	 * @return Criterion value.
+  	 */
 	private float evalInterval(int cd[]) {
 		int Nj = 0;
 		float suma, factor;
@@ -687,6 +534,12 @@ public class REBdiscretize extends MOADiscretize {
 		return crit;
 	}
   
+  /**
+   * Create the first intervals with the set of boundary points.
+   * @param att Attribute index
+   * @param idx Vector of indexes sorted by value.
+   * @return A tree of tuples (boundary point, interval associated).
+   */
   private TreeMap <Float, Interval> initIntervals(int att, Integer[] idx) {
 		
 	  	TreeMap <Float, Interval> intervals = new TreeMap<Float, Interval> ();
@@ -733,6 +586,10 @@ public class REBdiscretize extends MOADiscretize {
 		return intervals;
 	}
   
+  /**
+   * Initialize all the variables during the first stage.
+   * @param inst The first example
+   */
   private void initializeLayers(Instance inst) {
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);
 	  numClasses = inst.numClasses();
@@ -755,6 +612,12 @@ public class REBdiscretize extends MOADiscretize {
 	  }  
   }
   
+  /**
+   * Transform a point by rounding it according to the number of decimals
+   * defined as input parameter.
+   * @param value Value to transform
+   * @return Rounded value.
+   */
   private float getInstanceValue(double value) {
 	  if(decimals > 0) {
 		  double mult = Math.pow(10, decimals);
@@ -763,6 +626,13 @@ public class REBdiscretize extends MOADiscretize {
 	  return (float) value;
   }
   
+  /**
+   * Get a new label for an interval. It is taken from
+   * the queue of labels if this is not empty. If not, 
+   * a new label equal to the current limit + 1 is returned.
+   * @param att Attribute index
+   * @return The label value to use.
+   */
   private int getLabel(int att){
 	  if(labelsToUse[att].isEmpty())
 		  return ++contLabels[att];
@@ -772,13 +642,13 @@ public class REBdiscretize extends MOADiscretize {
 	class Interval {
 		/**
 		 * <p>
-		 * Interval class.
+		 * Class that represent an interval determined by a rightmost boundary point and
+		 * an histogram of compounded points.
 		 * </p>
 		 */	
 		int label;
 		float end;
 		int [] cd;
-		LinkedList<Float> oldPoints; // Implemented as an evicted stack
 		TreeMap<Float, int[]> histogram;
 		float crit;
 		
@@ -789,10 +659,8 @@ public class REBdiscretize extends MOADiscretize {
 		public Interval(int _label) {
 			label = _label;
 			end = -1;
-			oldPoints = new LinkedList<Float>();
 			histogram = new TreeMap<Float, int[]>();
 			cd = new int[numClasses];
-			//histogram.put(_end, cd.clone());
 			crit = Float.MIN_VALUE;
 		}
 		
@@ -808,7 +676,6 @@ public class REBdiscretize extends MOADiscretize {
 		public Interval(int _label, float _end, int _class) {
 			label = _label;
 			end = _end;
-			oldPoints = new LinkedList<Float>();
 			histogram = new TreeMap<Float, int[]>();
 			cd = new int[numClasses];
 			cd[_class] = 1;
@@ -822,13 +689,11 @@ public class REBdiscretize extends MOADiscretize {
 			end = other.end;
 			cd = other.cd.clone();
 			crit = other.crit;
-			oldPoints = new LinkedList<Float>(other.oldPoints);
 			histogram = new TreeMap<Float, int[]>();
 			histogram.putAll(other.histogram);
 		}
 		
 		public void addPoint(int att, float value, int cls){
-			//checkHistogramIntervals(this);
 			int[] pd = histogram.get(value);
 			if(pd != null) {
 				pd[cls]++;
@@ -841,11 +706,9 @@ public class REBdiscretize extends MOADiscretize {
 			cd[cls]++;
 			if(value > end) 
 				end = value;
-			//checkHistogramIntervals(this);
 		}
 		
 		public void addPoint(float value, int cd[]){
-			//checkHistogramIntervals(this);
 			int[] prevd = histogram.get(value);
 			if(prevd == null) {
 				prevd = new int[numClasses];
@@ -861,7 +724,6 @@ public class REBdiscretize extends MOADiscretize {
 			
 			if(value > end) 
 				end = value;
-			//checkHistogramIntervals(this);
 		}
 		
 		public void addPoint(Tuple<Float, int[]> point){
@@ -869,7 +731,6 @@ public class REBdiscretize extends MOADiscretize {
 		}
 		
 		public void removePoint(int att, float value, int cls) {
-			//checkHistogramIntervals(this);
 			int[] pd = histogram.get(value);
 			if(pd != null) {
 				if(pd[cls] > 0) {
@@ -886,15 +747,12 @@ public class REBdiscretize extends MOADiscretize {
 						break;
 					}						
 				}
-				//if(histogram.size() < 2 && delete)
-					//System.err.println("Interval with a single point");
 				if(delete){ // We keep intervals with at least one point
 					histogram.remove(value);
 				}
 			} else {
 				// Error, no point in this range.
 				System.err.println("Point not found in the given range.");
-				//checkUnfoundPoint(att, value);
 			}
 			// Find a new maximum if the point removed is the maximum
 			if(value == end) {
@@ -902,26 +760,17 @@ public class REBdiscretize extends MOADiscretize {
 				if(newend != null)
 					end = newend;
 			}
-			//checkHistogramIntervals(this);
-		}
-		
-		public Interval splitByPrevMerge(int att) {			
-			Float value = oldPoints.pollLast();
-			if(value != null && value > this.end)
-				return splitInterval(att, value);
-			return null;
 		}
 		
 		public Interval splitInterval(int att, float value) {
 			
-			//checkHistogramIntervals(this);
 			TreeMap<Float, int[]> nHist = new TreeMap<Float, int[]>();
 			int[] nCd = new int[cd.length];
 			LinkedList<Float> nOP = new LinkedList<Float>();
 			
-			for (Iterator iterator = histogram.tailMap(value, false).entrySet().iterator(); iterator.hasNext();) {
+			for (Iterator<Entry<Float, int[]>> iterator = 
+					histogram.tailMap(value, false).entrySet().iterator(); iterator.hasNext();) {
 				Entry<Float, int[]> entry = (Entry) iterator.next();
-				//histogram.entries().remove(entry);
 				nHist.put(entry.getKey(), entry.getValue());
 				for(int i = 0; i < entry.getValue().length; i++){
 					nCd[i] += entry.getValue()[i];
@@ -932,15 +781,6 @@ public class REBdiscretize extends MOADiscretize {
 			
 			if(nHist.isEmpty())
 				return null;
-			
-			// Split old points
-			for (Iterator<Float> iterator = oldPoints.iterator(); iterator.hasNext();) {
-				float float1 = (float) iterator.next();
-				if(float1 > value){
-					nOP.add(float1);
-					iterator.remove();
-				}
-			}
 			
 			/** New interval (which lays at the right of the cut point) **/
 			int s1 = 0, s2 = 0;
@@ -958,27 +798,17 @@ public class REBdiscretize extends MOADiscretize {
 			}
 			nInterval.cd = nCd;
 			nInterval.histogram = nHist;
-			nInterval.oldPoints = nOP;
 			nInterval.end = this.end;
 			nInterval.updateCriterion();
 			/** Old interval (which lays at the left of the cut point) **/
-			//this.label -= nHist.size();
 			this.end = value;
 			updateCriterion();
-			
-			// Testings
-			//checkHistogramIntervals(this);
-			//checkHistogramIntervals(nInterval);
 			
 			return nInterval;
 		}
 		
 		public int mergeIntervals(Interval interv2){
-			// The interval with less elements lose its label
-			//label = (this.label > interv2.label) ? this.label : interv2.label;
-			//checkHistogramIntervals(this);
-			//checkHistogramIntervals(interv2);
-			
+			// The interval with less elements lose its label			
 			int s1 = 0, s2 = 0;
 			for (int i = 0; i < cd.length; i++) {
 				s1 += cd[i];
@@ -991,15 +821,8 @@ public class REBdiscretize extends MOADiscretize {
 				this.label = interv2.label;
 			}
 			
-			// Merge old splitting points
-			float innerpoint = (this.end < interv2.end) ? this.end : interv2.end;
-			if(oldPoints.size() >= MAX_OLD)
-				oldPoints.pollFirst(); // Remove the oldest element
-			oldPoints.add(innerpoint);
-			
 			// Set the new end
 			end = (this.end > interv2.end) ? this.end : interv2.end;
-			//end = (interv2.end + end) / 2.0f;
 			
 			// Merge histograms and class distributions
 			for (int i = 0; i < cd.length; i++) {
@@ -1016,9 +839,6 @@ public class REBdiscretize extends MOADiscretize {
 					histogram.put(entry.getKey(), entry.getValue());
 				}
 			}
-			
-			// Testings
-			//checkHistogramIntervals(this);
 			
 			updateCriterion();
 			return oldlab;

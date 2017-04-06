@@ -43,11 +43,12 @@ public class LFODiscretizer extends MOADiscretize {
 	private static int MAX_OLD = 5;
 	private int maxHist;
 	private int decimals;
-	// Queu of labels for each attribute
+	// Queue of labels for each attribute
 	private Queue<Integer>[] labelsToUse;
 	private LinkedList<Tuple<Float, Byte>>[] elemQ;
 	private int maxLabels;
 	private int[] contLabels;
+	private int[][] classByAtt;
 	
 	/**
 	 * Default constructor. Parameters has been set to 
@@ -119,6 +120,12 @@ public class LFODiscretizer extends MOADiscretize {
 	  }
 	  
 	  totalCount++;
+	  // Count number of elements per class
+	  for (int i = 0; i < instance.numAttributes(); i++) {
+		 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
+			 classByAtt[i][(int) instance.classValue()]++;		 
+		 }
+	  }
     
 	  // If there are enough instances to initialize cut points, do it!
 	  if(totalCount >= initTh){
@@ -164,8 +171,10 @@ public class LFODiscretizer extends MOADiscretize {
    */
   private void removeOldsUntilSize(int att, Interval interv, int size) {
 	  while(!elemQ[att].isEmpty() && interv.histogram.size() > size) {
-		  removePointFromInteravls(att, elemQ[att].poll());
-	  }	  
+		  Tuple<Float, Byte> tuple = elemQ[att].poll();
+		  if(removePointFromInteravls(att, tuple))
+			  classByAtt[att][tuple.y]--;
+	  }
   }
   
   /**
@@ -600,12 +609,14 @@ public class LFODiscretizer extends MOADiscretize {
 	  elemQ = new LinkedList[numAttributes];
 	  labelsToUse = new Queue[numAttributes];
 	  contLabels = new int[numAttributes];
+	  classByAtt = new int[numAttributes][];
 	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  allIntervals[i] = new TreeMap<Float, Interval>();
 		  elemQ[i] = new LinkedList<Tuple<Float, Byte>>();
 		  labelsToUse[i] = new LinkedList<Integer>();
 		  contLabels[i] = maxLabels;
+		  classByAtt[i] = new int[numClasses];
 		  for (int j = 1; j < maxLabels + 1; j++) {
 				labelsToUse[i].add(j);
 		  }
@@ -624,6 +635,22 @@ public class LFODiscretizer extends MOADiscretize {
 		  return (float) (Math.round(value * mult) / mult);
 	  }
 	  return (float) value;
+  }
+  
+  public float getProbAttValGivenClass(int attI, double attVal, int classVal) {
+	  int c = getAttValGivenClass(attI, attVal, classVal);
+	  return c / ((float) classByAtt[attI][classVal]);
+			
+  }
+  
+  public int getAttValGivenClass(int attI, double attVal, int classVal) {
+	  Map.Entry<Float, Interval> centralE = allIntervals[attI]
+			  .ceilingEntry(getInstanceValue(attVal));
+	  if(centralE != null) {
+		  return centralE.getValue().cd[classVal];
+	  }
+	  return 0;
+			
   }
   
   /**

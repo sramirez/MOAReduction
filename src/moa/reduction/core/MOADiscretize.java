@@ -587,6 +587,8 @@ public abstract class MOADiscretize extends Filter {
 	 * Update the discretization model without updating 
 	 * @param inst
 	 */
+	public abstract float getProbAttValGivenClass(int attI, double attVal, int classVal);
+	public abstract int getAttValGivenClass(int attI, double attVal, int classVal);
 	public abstract void updateEvaluator(Instance inst);
 	public abstract Instance applyDiscretization(Instance inst);
 

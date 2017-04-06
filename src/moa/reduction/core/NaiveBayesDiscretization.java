@@ -66,7 +66,7 @@ import weka.core.Attribute;
  * @author Richard Kirkby (rkirkby@cs.waikato.ac.nz)
  * @version $Revision: 7 $
  */
-public class NaiveBayesReduction extends AbstractClassifier {
+public class NaiveBayesDiscretization extends AbstractClassifier {
 
     private static final long serialVersionUID = 1L;
 
@@ -189,17 +189,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
 
     @Override
     public double[] getVotesForInstance(Instance inst) {
-
-
-    	/*long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
-		double[] prediction = doNaiveBayesPrediction(inst, this.observedClassDistribution,
-				this.attributeObservers);
-
-		  sumTime2 += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
-
-	        if(totalCount == 49999)
-	        	System.out.println("Total time: " + sumTime2);
-        return prediction;*/
     	return doNaiveBayesPrediction(inst, this.observedClassDistribution,
 				this.attributeObservers);
     }
@@ -248,51 +237,12 @@ public class NaiveBayesReduction extends AbstractClassifier {
         return new GaussianNumericAttributeClassObserver();
     }
     
-    private void performFS(Instance rinst) {
-    	// Feature selection process performed before
-		weka.core.Instance winst = new weka.core.DenseInstance(rinst.weight(), rinst.toDoubleArray());
-		
-		if(fselector != null) {
-			if(fselector.isUpdated() && totalCount % winSizeOption.getValue() == 0) {
-		    	fselector.applySelection();
-				selector = new AttributeSelection();
-				Ranker ranker = new Ranker();
-				ranker.setNumToSelect(Math.min(numFeaturesOption.getValue(), winst.numAttributes() - 1));
-				selector.setEvaluator((ASEvaluation) fselector);
-				selector.setSearch(ranker);
-		    	
-				ArrayList<Attribute> list = new ArrayList<Attribute>();
-			  	//ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
-			  	//list.add(winst.classAttribute());
-				for(int i = 0; i < rinst.numAttributes(); i++) 
-					list.add(new Attribute(rinst.attribute(i).name(), i));
-				//ArrayList<Attribute> list = Collections.list(winst.enumerateAttributes());
-				//list.add(winst.classAttribute());
-			  	weka.core.Instances single = new weka.core.Instances ("single", list, 1);
-			  	single.setClassIndex(rinst.classIndex());
-			  	single.add(winst);
-			  	try {
-					selector.SelectAttributes(single);
-					System.out.println("Selected features: " + selector.toResultsString());
-					selectedFeatures.clear();
-					for(int att : selector.selectedAttributes())
-						selectedFeatures.add(att);
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-    	}
-    }
-
     public double[] doNaiveBayesPrediction(Instance inst,
             DoubleVector observedClassDistribution,
             AutoExpandVector<AttributeClassObserver> attributeObservers) {
     	
     	// Feature selection process performed before
     	Instance sinst = inst.copy();
-    	if(fsmethodOption.getValue() != 0 && fselector != null) 
-    		performFS(sinst);
     	if(discmethodOption.getValue() != 0 && discretizer != null) 
     		sinst = discretizer.applyDiscretization(sinst);
 		
@@ -305,9 +255,8 @@ public class NaiveBayesReduction extends AbstractClassifier {
             for (int attIndex = 0; attIndex < sinst.numAttributes() - 1; attIndex++) {
             	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
 	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
-	                AttributeClassObserver obs = attributeObservers.get(attIndex);
-	                if ((obs != null) && !sinst.isMissing(instAttIndex)) {
-	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(
+	                if (!sinst.isMissing(instAttIndex)) {
+	                	votes[classIndex] *= discretizer.getProbAttValGivenClass(instAttIndex, 
 	                			sinst.value(instAttIndex), classIndex);
 	                }
             	}
@@ -335,8 +284,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
             AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
     	
     	Instance rinst = inst.copy();
-    	// Feature selection process performed before
-    	performFS(rinst);
     	
         AttributeClassObserver obs;
         double[] votes = new double[observedClassDistribution.numValues()];

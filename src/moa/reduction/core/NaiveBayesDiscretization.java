@@ -23,7 +23,9 @@ package moa.reduction.core;
 //import weka.attributeSelection.InfoGainAttributeEval; 
 //import weka.attributeSelection.Ranker;
 //import weka.attributeSelection.AttributeSelection;
-import weka.attributeSelection.*; 
+import java.util.HashSet;
+import java.util.Set;
+
 import moa.classifiers.AbstractClassifier;
 import moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
@@ -33,7 +35,6 @@ import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
-import moa.core.TimingUtils;
 import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
@@ -41,15 +42,11 @@ import moa.reduction.bayes.LFODiscretizer;
 import moa.reduction.bayes.OCdiscretize;
 import moa.reduction.bayes.OFSGDAttributeEval;
 import moa.reduction.bayes.PIDdiscretize;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import weka.attributeSelection.AttributeSelection;
+import weka.core.Utils;
 
 import com.github.javacliparser.IntOption;
 import com.yahoo.labs.samoa.instances.Instance;
-
-import weka.core.Attribute;
 
 /**
  * Naive Bayes incremental learner.
@@ -249,30 +246,24 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
 		// Naive Bayes predictions
         double[] votes = new double[observedClassDistribution.numValues()];
         double observedClassSum = observedClassDistribution.sumOfValues();
+        double[] originalClassProb = new double[observedClassDistribution.numValues()];
         for (int classIndex = 0; classIndex < votes.length; classIndex++) {
             votes[classIndex] = observedClassDistribution.getValue(classIndex)
                     / observedClassSum;
+            originalClassProb[classIndex] = votes[classIndex]; // copy that value
             for (int attIndex = 0; attIndex < sinst.numAttributes() - 1; attIndex++) {
             	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
 	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
 	                if (!sinst.isMissing(instAttIndex)) {
-	                	votes[classIndex] *= discretizer.getProbAttValGivenClass(instAttIndex, 
-	                			sinst.value(instAttIndex), classIndex);
+	                	votes[classIndex] *= discretizer.jointProbValueClass(instAttIndex, 
+	                			sinst.value(instAttIndex), classIndex) / originalClassProb[classIndex];
 	                }
             	}
             }
         }
         // TODO: need logic to prevent underflow?
         // Compute some statistics about classification performance
-        double maxValue = -1;
-        int maxIndex = -1;
-        for (int i = 0; i < votes.length; i++) {
-			if(votes[i] > maxValue){
-				maxIndex = i;
-				maxValue = votes[i];
-			}
-		}
-        if(maxIndex == inst.classIndex())
+        if(Utils.maxIndex(votes) == inst.classIndex())
         	correctlyClassified++;
         classified++;
         return votes;

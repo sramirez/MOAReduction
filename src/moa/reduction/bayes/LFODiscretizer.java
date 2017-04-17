@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.TreeMap;
 
+import weka.core.Utils;
 import moa.reduction.core.MOADiscretize;
 
 import com.yahoo.labs.samoa.instances.Instance;
@@ -636,11 +637,12 @@ public class LFODiscretizer extends MOADiscretize {
 	  }
 	  return (float) value;
   }
-  
-  public float getProbAttValGivenClass(int attI, double attVal, int classVal) {
-	  int c = getAttValGivenClass(attI, attVal, classVal);
-	  return c / ((float) classByAtt[attI][classVal]);
-			
+
+  @Override
+  public float jointProbValueClass(int attI, double attVal, int classVal) {
+		// TODO Auto-generated method stub
+		int c = getAttValGivenClass(attI, attVal, classVal);
+		return c / (float) Utils.sum(classByAtt[attI]);
   }
   
   public int getAttValGivenClass(int attI, double attVal, int classVal) {
@@ -649,8 +651,7 @@ public class LFODiscretizer extends MOADiscretize {
 	  if(centralE != null) {
 		  return centralE.getValue().cd[classVal];
 	  }
-	  return 0;
-			
+	  return 0;		
   }
   
   /**
@@ -893,6 +894,7 @@ public class LFODiscretizer extends MOADiscretize {
 		    this.x = x; 
 		    this.y = y; 
 		  } 
-		} 
+		}
+
 
 }

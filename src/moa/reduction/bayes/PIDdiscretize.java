@@ -72,6 +72,7 @@ public class PIDdiscretize extends MOADiscretize {
   protected List<List<Float>> m_Counts = null;
   
   protected List<List<Map<Integer, Float>>> m_Distrib = null;
+  protected List<List<Map<Integer, Float>>> m_Distrib2 = null;
   
   protected double step;
   
@@ -127,6 +128,8 @@ public class PIDdiscretize extends MOADiscretize {
 	  m_CutPointsL1 = new ArrayList<List<Double>>(inst.numAttributes());
 	  m_Counts = new ArrayList<List<Float>>(inst.numAttributes());
 	  m_Distrib = new ArrayList<List<Map<Integer, Float>>>(inst.numAttributes());
+	  m_Distrib2 = new ArrayList<List<Map<Integer, Float>>>(inst.numAttributes());
+	  
 	  for (int i = 0; i < inst.numAttributes(); i++) {
 		  Double[] initialb = new Double[initialBinsL1 + 1];
 		  Float[] initialc = new Float[initialBinsL1 + 1];
@@ -139,7 +142,7 @@ public class PIDdiscretize extends MOADiscretize {
 		  }
 		  m_CutPointsL1.add(new ArrayList<Double>(Arrays.asList(initialb)));
 		  m_Counts.add(new ArrayList<Float>(Arrays.asList(initialc)));
-		  m_Distrib.add(initiald);			  
+		  m_Distrib.add(initiald);
 	  }  
 	  initL2FromL1();
   }
@@ -159,9 +162,38 @@ public class PIDdiscretize extends MOADiscretize {
     		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
     			  m_CutPoints[i][j] = m_CutPointsL1.get(i).get(j);
     		  }
-    	  }    	  
+    	  } 
+    	  updateDistributionsL2(i, m_CutPoints[i]);
       }
     }	
+  }
+  
+  
+  private void updateDistributionsL2(int att, double[] newpoints) {
+	  boolean cont = true;
+	  List<Map<Integer, Float>> intervals = new ArrayList<Map<Integer, Float>>(newpoints.length + 1);
+	  Map<Integer, Float> interv = new HashMap<Integer, Float>();
+	  for (int i = 0, j = 0; i < m_CutPointsL1.get(att).size() && cont; i++) {
+		  double cp = m_CutPointsL1.get(att).get(i);  
+		  while(newpoints[j] <= cp && cont){
+			  Map<Integer, Float> aux = m_Distrib.get(att).get(i);			  
+			  // Aggregate by sum the maps
+			  for(Integer key : aux.keySet()) {
+				    if(interv.containsKey(key)) {
+				        interv.put(key, aux.get(key) + interv.get(key));
+				    } else {
+				        interv.put(key, aux.get(key));
+				    }
+			  }
+			  j++;
+			  if(j >= newpoints.length){
+				  cont = false; // get out
+			  }
+		  }
+		  intervals.add(interv);
+		  interv = new HashMap<Integer, Float>();			
+	  }	
+	  m_Distrib2.set(att, intervals);
   }
   
   private void initL2FromL1() {
@@ -333,4 +365,16 @@ public class PIDdiscretize extends MOADiscretize {
 	      return null;
 	    }
   	}
+
+	@Override
+	public float jointProbValueClass(int attI, double attVal, int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	
+	@Override
+	public int getAttValGivenClass(int attI, double attVal, int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

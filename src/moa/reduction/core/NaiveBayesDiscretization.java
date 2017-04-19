@@ -80,7 +80,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 5, 0, 5);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. LOFD", 1, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 5000, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
@@ -160,28 +160,38 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
 		  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
     	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
-        for (int i = 0; i < rinst.numAttributes() - 1; i++) {
-            int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
-            AttributeClassObserver obs = this.attributeObservers.get(i);
-            com.yahoo.labs.samoa.instances.Attribute att = rinst.attribute(instAttIndex);
-            if (obs == null || (att.isNominal() && obs instanceof NumericAttributeClassObserver)) {
-                obs = att.isNominal() ? newNominalClassObserver()
-                        : newNumericClassObserver();
-                this.attributeObservers.set(i, obs);
+        if(discretizer == null || !discretizer.m_Init) { // Discretizer performs observation tasks
+        	for (int i = 0; i < rinst.numAttributes() - 1; i++) {        		
+        		if(!discretizedAttribute(i)) {
+                    int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
+                    AttributeClassObserver obs = this.attributeObservers.get(i);
+                    com.yahoo.labs.samoa.instances.Attribute att = rinst.attribute(instAttIndex);
+                    if (obs == null || (att.isNominal() && obs instanceof NumericAttributeClassObserver)) {
+                        obs = att.isNominal() ? newNominalClassObserver()
+                                : newNumericClassObserver();
+                        this.attributeObservers.set(i, obs);
+                    }
+                    
+                    // Problem with spam assasin
+                    double value = rinst.value(instAttIndex);
+                    if(rinst.value(instAttIndex) == -1) {
+                    	System.out.println("Value changed");
+                    	value = 0;            	
+                    }
+                    obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
+        		}
             }
-            
-            // Problem with spam assasin
-            double value = rinst.value(instAttIndex);
-            if(rinst.value(instAttIndex) == -1) {
-            	System.out.println("Value changed");
-            	value = 0;            	
-            }
-            obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
+
         }
-        
+                
         totalCount++;
         //if(totalCount == 50000)
         	//System.out.println("Total time: " + sumTime);
+    }
+    
+    private boolean discretizedAttribute(int attIndex){
+    	return discretizer != null && discretizer.m_Init &&
+    			discretizer.m_CutPoints[attIndex] != null;
     }
 
     @Override
@@ -240,9 +250,10 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     	
     	// Feature selection process performed before
     	Instance sinst = inst.copy();
-    	if(discmethodOption.getValue() != 0 && discretizer != null) 
+    	if(discmethodOption.getValue() != 0 && discretizer != null) {
     		sinst = discretizer.applyDiscretization(sinst);
-		
+    	}
+    	
 		// Naive Bayes predictions
         double[] votes = new double[observedClassDistribution.numValues()];
         double observedClassSum = observedClassDistribution.sumOfValues();
@@ -255,8 +266,18 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
             	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
 	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
 	                if (!sinst.isMissing(instAttIndex)) {
-	                	votes[classIndex] *= discretizer.jointProbValueClass(instAttIndex, 
-	                			sinst.value(instAttIndex), classIndex) / originalClassProb[classIndex];
+	                	if(discretizedAttribute(attIndex)) {
+	                		float joint = discretizer.jointProbValueClass(instAttIndex, 
+		                			inst.value(instAttIndex), (int) sinst.value(instAttIndex),
+		                			classIndex) ;
+		                	votes[classIndex] *= joint / originalClassProb[classIndex];
+	                	} else {
+	                		AttributeClassObserver obs = attributeObservers.get(attIndex);
+	    	                if ((obs != null)) {
+	    	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(
+	    	                			sinst.value(instAttIndex), classIndex);
+	    	                }
+	                	}
 	                }
             	}
             }

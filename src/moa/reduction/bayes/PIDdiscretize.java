@@ -27,10 +27,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.yahoo.labs.samoa.instances.Instance;
-
 import moa.reduction.core.MOADiscretize;
 import weka.core.ContingencyTables;
+
+import com.yahoo.labs.samoa.instances.Instance;
 
 /**
  <!-- globalinfo-start -->
@@ -116,6 +116,7 @@ public class PIDdiscretize extends MOADiscretize {
     
 	  if(totalCount > 0 && totalCount % l2UpdateExamples == 0){
 		  updateLayer2(instance);
+		  m_Init = true;
 	  }
 
 	 if(totalCount % 101 == 0) 
@@ -188,6 +189,7 @@ public class PIDdiscretize extends MOADiscretize {
 			  j++;
 			  if(j >= newpoints.length){
 				  cont = false; // get out
+				  break;
 			  }
 		  }
 		  intervals.add(interv);
@@ -202,7 +204,7 @@ public class PIDdiscretize extends MOADiscretize {
 		  m_CutPoints[i] = new double[m_CutPointsL1.get(i).size()];
 		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
 			  m_CutPoints[i][j] = m_CutPointsL1.get(i).get(j);
-		  } 
+		  }
 	  }	  
   }
 
@@ -366,15 +368,16 @@ public class PIDdiscretize extends MOADiscretize {
 	    }
   	}
 
-	@Override
-	public float jointProbValueClass(int attI, double attVal, int classVal) {
+
+  @Override
+  public float jointProbValueClass(int attI, double rVal, int dVal, int classVal) {
 		// TODO Auto-generated method stub
-		return 0;
-	}
-	
-	@Override
-	public int getAttValGivenClass(int attI, double attVal, int classVal) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+		int c = getAttValGivenClass(attI, rVal, dVal, classVal);
+		return c / (float) totalCount;
+  }
+  
+  @Override
+  public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
+	  return m_Distrib2.get(attI).get(dVal).get(classVal).intValue();		
+  }
 }

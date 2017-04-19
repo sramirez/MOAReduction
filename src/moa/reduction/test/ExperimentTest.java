@@ -14,6 +14,7 @@ import moa.classifiers.lazy.kNN;
 import moa.classifiers.meta.FISH;
 import moa.core.InstanceExample;
 import moa.core.TimingUtils;
+import moa.reduction.core.NaiveBayesDiscretization;
 import moa.reduction.core.NaiveBayesReduction;
 import moa.streams.ArffFileStream;
 import moa.streams.generators.RandomRBFGenerator;
@@ -27,10 +28,11 @@ public class ExperimentTest {
         		//kNN knn = new kNN();
         		//knn.kOption.setValue(3);
         		//Classifier learner = knn;
-        		Classifier learner = new NaiveBayesReduction();
+        		Classifier learner = new NaiveBayesDiscretization();
                 
                 //RandomRBFGenerator stream = new RandomRBFGenerator();
-        		ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/covtypeNorm.arff", -1);
+        		ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/elecNormNew.arff", -1);
+        		//ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/real/covtypeNorm.arff", -1);
                 //ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/sudden_drift_med.arff", -1);
         		//ArffFileStream stream = new ArffFileStream("/home/sramirez/TEST_FUSINTER/datasets/spambase/spambase-10-1tra-weka.dat", -1);
         		//ArffFileStream stream = new ArffFileStream("/home/sramirez/datasets/drift/artificial/gradual_drift_100k.arff", -1);
@@ -61,6 +63,6 @@ public class ExperimentTest {
 
         public static void main(String[] args) throws IOException {
         		ExperimentTest exp = new ExperimentTest();
-                exp.run(50000, true);
+                exp.run(100000, true);
         }
 }

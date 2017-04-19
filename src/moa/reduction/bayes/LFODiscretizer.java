@@ -38,10 +38,8 @@ public class LFODiscretizer extends MOADiscretize {
 	private static final long serialVersionUID = 1L;
 	private int totalCount, numClasses, numAttributes;
 	TreeMap<Float, Interval>[] allIntervals;
-	boolean init = false;
 	private float lambda, alpha;
 	private int initTh;
-	private static int MAX_OLD = 5;
 	private int maxHist;
 	private int decimals;
 	// Queue of labels for each attribute
@@ -88,7 +86,7 @@ public class LFODiscretizer extends MOADiscretize {
 	 * @return A new instance discretized.
 	 */
 	public Instance applyDiscretization(Instance inst) {
-		  if(init){
+		  if(m_Init){
 			  for (int i = 0; i < inst.numAttributes(); i++) {
 				 // if numeric and not missing, discretize
 				 if(inst.attribute(i).isNumeric() && !inst.isMissing(i)) {
@@ -130,7 +128,7 @@ public class LFODiscretizer extends MOADiscretize {
     
 	  // If there are enough instances to initialize cut points, do it!
 	  if(totalCount >= initTh){
-		  if(init) {			  
+		  if(m_Init) {			  
 			  for (int i = 0; i < instance.numAttributes(); i++) {
 				 if(instance.attribute(i).isNumeric() && !instance.isMissing(i)) {
 					 insertExample(i, instance); 					 
@@ -141,7 +139,7 @@ public class LFODiscretizer extends MOADiscretize {
 			  addExampleToQueue(instance);
 			  batchFusinter(instance);
 			  	
-			  init = true;
+			  m_Init = true;
 		  }
 	  } else {
 		  addExampleToQueue(instance);
@@ -639,15 +637,16 @@ public class LFODiscretizer extends MOADiscretize {
   }
 
   @Override
-  public float jointProbValueClass(int attI, double attVal, int classVal) {
+  public float jointProbValueClass(int attI, double rVal, int dVal, int classVal) {
 		// TODO Auto-generated method stub
-		int c = getAttValGivenClass(attI, attVal, classVal);
+		int c = getAttValGivenClass(attI, rVal, dVal, classVal);
 		return c / (float) Utils.sum(classByAtt[attI]);
   }
   
-  public int getAttValGivenClass(int attI, double attVal, int classVal) {
+  @Override
+  public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
 	  Map.Entry<Float, Interval> centralE = allIntervals[attI]
-			  .ceilingEntry(getInstanceValue(attVal));
+			  .ceilingEntry(getInstanceValue(rVal));
 	  if(centralE != null) {
 		  return centralE.getValue().cd[classVal];
 	  }
@@ -794,7 +793,6 @@ public class LFODiscretizer extends MOADiscretize {
 			
 			TreeMap<Float, int[]> nHist = new TreeMap<Float, int[]>();
 			int[] nCd = new int[cd.length];
-			LinkedList<Float> nOP = new LinkedList<Float>();
 			
 			for (Iterator<Entry<Float, int[]>> iterator = 
 					histogram.tailMap(value, false).entrySet().iterator(); iterator.hasNext();) {

@@ -50,6 +50,8 @@ public abstract class MOADiscretize extends Filter {
 	/** Precision for bin range labels */
 	protected int m_BinRangePrecision = 6;
 	
+	public boolean m_Init = false;
+	
 	/** Constructor - initialises the filter */
 	public MOADiscretize() {	
 	  setAttributeIndices("first-last");
@@ -587,8 +589,8 @@ public abstract class MOADiscretize extends Filter {
 	 * Update the discretization model without updating 
 	 * @param inst
 	 */
-	public abstract float jointProbValueClass(int attI, double attVal, int classVal);
-	public abstract int getAttValGivenClass(int attI, double attVal, int classVal);
+	public abstract float jointProbValueClass(int attI, double rVal, int dVal, int classVal);
+	public abstract int getAttValGivenClass(int attI, double rVal, int dVal, int classVal);
 	public abstract void updateEvaluator(Instance inst);
 	public abstract Instance applyDiscretization(Instance inst);
 

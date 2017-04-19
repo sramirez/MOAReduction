@@ -79,6 +79,7 @@ public class PIDdiscretize extends MOADiscretize {
   /** Constructor - initializes the filter */
   public PIDdiscretize() {
 	  setAttributeIndices("first-last");
+	  this.provideProb = true;
   }
   
   public PIDdiscretize(int initialElements, int initialBinsL1, int min, int max, int alpha, int l2UpdateExamples) {
@@ -144,6 +145,7 @@ public class PIDdiscretize extends MOADiscretize {
 		  m_CutPointsL1.add(new ArrayList<Double>(Arrays.asList(initialb)));
 		  m_Counts.add(new ArrayList<Float>(Arrays.asList(initialc)));
 		  m_Distrib.add(initiald);
+		  m_Distrib2.add(new ArrayList<Map<Integer, Float>>(initialBinsL1 + 1));
 	  }  
 	  initL2FromL1();
   }
@@ -156,8 +158,11 @@ public class PIDdiscretize extends MOADiscretize {
         && (instance.attribute(i).isNumeric())) {
     	  double[] attCutPoints = cutPointsForSubset(i, 0, m_CutPointsL1.get(i).size());
     	  if(attCutPoints != null) {
-    		  m_CutPoints[i] = new double[attCutPoints.length];
+    		  m_CutPoints[i] = new double[attCutPoints.length + 1];
     		  System.arraycopy(attCutPoints, 0, m_CutPoints[i], 0, attCutPoints.length);  
+    		  m_CutPointsL1.get(i).size();
+    		  m_CutPoints[i][m_CutPoints[i].length - 1] = 
+    				  m_CutPointsL1.get(i).get(m_CutPointsL1.get(i).size() - 1);
     	  } else {
     		  m_CutPoints[i] = new double[m_CutPointsL1.get(i).size()];
     		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {
@@ -174,10 +179,10 @@ public class PIDdiscretize extends MOADiscretize {
 	  boolean cont = true;
 	  List<Map<Integer, Float>> intervals = new ArrayList<Map<Integer, Float>>(newpoints.length + 1);
 	  Map<Integer, Float> interv = new HashMap<Integer, Float>();
-	  for (int i = 0, j = 0; i < m_CutPointsL1.get(att).size() && cont; i++) {
-		  double cp = m_CutPointsL1.get(att).get(i);  
-		  while(newpoints[j] <= cp && cont){
-			  Map<Integer, Float> aux = m_Distrib.get(att).get(i);			  
+	  List<Double> oldpoints = m_CutPointsL1.get(att);
+	  for (int i = 0, j = 0; i < newpoints.length && cont; i++) {
+		  while(oldpoints.get(j) <= newpoints[i] && cont){
+			  Map<Integer, Float> aux = m_Distrib.get(att).get(j);			  
 			  // Aggregate by sum the maps
 			  for(Integer key : aux.keySet()) {
 				    if(interv.containsKey(key)) {
@@ -187,7 +192,7 @@ public class PIDdiscretize extends MOADiscretize {
 				    }
 			  }
 			  j++;
-			  if(j >= newpoints.length){
+			  if(j >= oldpoints.size()){
 				  cont = false; // get out
 				  break;
 			  }
@@ -378,6 +383,6 @@ public class PIDdiscretize extends MOADiscretize {
   
   @Override
   public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
-	  return m_Distrib2.get(attI).get(dVal).get(classVal).intValue();		
+	  return m_Distrib2.get(attI).get(dVal).getOrDefault(classVal, 0.0f).intValue();
   }
 }

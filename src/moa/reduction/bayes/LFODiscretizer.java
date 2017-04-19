@@ -49,6 +49,7 @@ public class LFODiscretizer extends MOADiscretize {
 	private int[] contLabels;
 	private int[][] classByAtt;
 	
+	
 	/**
 	 * Default constructor. Parameters has been set to 
 	 * the best configuration according to the authors.
@@ -62,6 +63,7 @@ public class LFODiscretizer extends MOADiscretize {
 		this.maxHist = 10000;
 		this.decimals = 3;
 		this.maxLabels = 1000;
+		this.provideProb = true;
 	}
 	
 	/**

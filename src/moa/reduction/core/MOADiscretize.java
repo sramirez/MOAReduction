@@ -52,6 +52,8 @@ public abstract class MOADiscretize extends Filter {
 	
 	public boolean m_Init = false;
 	
+	public boolean provideProb = false;
+	
 	/** Constructor - initialises the filter */
 	public MOADiscretize() {	
 	  setAttributeIndices("first-last");
@@ -492,6 +494,8 @@ public abstract class MOADiscretize extends Filter {
 	
 	  // Compute information gain.
 	  gain = priorEntropy - entropy;
+	  if(gain == priorEntropy)
+		  System.err.println("hOLA");
 	
 	  // Number of classes occuring in the set
 	  numClassesTotal = 0;

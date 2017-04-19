@@ -394,7 +394,7 @@ public class LFODiscretizer extends MOADiscretize {
 		  if(cd1[i] + cd2[i] > 0) {
 			  if(++count > 1) {
 				  return true;
-			  }						  
+			  }			  
 		  }
 	  }
 	  return false;

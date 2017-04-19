@@ -160,8 +160,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
 		  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
     	
         this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
-        if(discretizer == null || !discretizer.m_Init) { // Discretizer performs observation tasks
-        	for (int i = 0; i < rinst.numAttributes() - 1; i++) {        		
+        for (int i = 0; i < rinst.numAttributes() - 1; i++) {        		
         		if(!discretizedAttribute(i)) {
                     int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
                     AttributeClassObserver obs = this.attributeObservers.get(i);
@@ -171,19 +170,9 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
                                 : newNumericClassObserver();
                         this.attributeObservers.set(i, obs);
                     }
-                    
-                    // Problem with spam assasin
-                    double value = rinst.value(instAttIndex);
-                    if(rinst.value(instAttIndex) == -1) {
-                    	System.out.println("Value changed");
-                    	value = 0;            	
-                    }
-                    obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
+                    obs.observeAttributeClass(rinst.value(instAttIndex), (int) rinst.classValue(), rinst.weight());
         		}
-            }
-
-        }
-                
+        }                
         totalCount++;
         //if(totalCount == 50000)
         	//System.out.println("Total time: " + sumTime);
@@ -261,18 +250,18 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
         for (int classIndex = 0; classIndex < votes.length; classIndex++) {
             votes[classIndex] = observedClassDistribution.getValue(classIndex)
                     / observedClassSum;
-            originalClassProb[classIndex] = votes[classIndex]; // copy that value
+            originalClassProb[classIndex] = votes[classIndex]; // copy this value
             for (int attIndex = 0; attIndex < sinst.numAttributes() - 1; attIndex++) {
             	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
 	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
 	                if (!sinst.isMissing(instAttIndex)) {
-	                	if(discretizedAttribute(attIndex)) {
+	                	if(discretizedAttribute(instAttIndex)) {
 	                		float joint = discretizer.jointProbValueClass(instAttIndex, 
 		                			inst.value(instAttIndex), (int) sinst.value(instAttIndex),
 		                			classIndex);
 			                votes[classIndex] *= joint / originalClassProb[classIndex];
 	                	} else {
-	                		AttributeClassObserver obs = attributeObservers.get(attIndex);
+	                		AttributeClassObserver obs = attributeObservers.get(instAttIndex);
 	    	                if ((obs != null)) {
 	    	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(
 	    	                			sinst.value(instAttIndex), classIndex);

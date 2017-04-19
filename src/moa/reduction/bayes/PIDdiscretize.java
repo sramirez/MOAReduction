@@ -158,11 +158,15 @@ public class PIDdiscretize extends MOADiscretize {
         && (instance.attribute(i).isNumeric())) {
     	  double[] attCutPoints = cutPointsForSubset(i, 0, m_CutPointsL1.get(i).size());
     	  if(attCutPoints != null) {
-    		  m_CutPoints[i] = new double[attCutPoints.length + 1];
-    		  System.arraycopy(attCutPoints, 0, m_CutPoints[i], 0, attCutPoints.length);  
-    		  m_CutPointsL1.get(i).size();
-    		  m_CutPoints[i][m_CutPoints[i].length - 1] = 
-    				  m_CutPointsL1.get(i).get(m_CutPointsL1.get(i).size() - 1);
+    		  double lastpoint = m_CutPointsL1.get(i).get(m_CutPointsL1.get(i).size() - 1);
+    		  if(lastpoint != attCutPoints[attCutPoints.length - 1]){
+        		  m_CutPoints[i] = new double[attCutPoints.length + 1];
+        		  System.arraycopy(attCutPoints, 0, m_CutPoints[i], 0, attCutPoints.length);
+        		  m_CutPoints[i][m_CutPoints[i].length - 1] = lastpoint;
+    		  } else {
+    			  m_CutPoints[i] = new double[attCutPoints.length];
+        		  System.arraycopy(attCutPoints, 0, m_CutPoints[i], 0, attCutPoints.length);        			  
+    		  }
     	  } else {
     		  m_CutPoints[i] = new double[m_CutPointsL1.get(i).size()];
     		  for (int j = 0; j < m_CutPointsL1.get(i).size(); j++) {

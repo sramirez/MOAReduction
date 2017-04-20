@@ -187,4 +187,17 @@ public class IDAdiscretize extends MOADiscretize {
 			sReservoirs[i] = new IntervalHeap(this.nBins, this.sampleSize, i);
 		}
 	}
+
+	@Override
+	public float condProbGivenClass(int attI, double rVal, int dVal,
+			int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

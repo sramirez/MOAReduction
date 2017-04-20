@@ -417,7 +417,7 @@ public abstract class MOADiscretize extends Filter {
 	      if (m_DiscretizeCols.isInRange(i)
 	        && instance.attribute(i).isNumeric()) {
 	        int j;
-	        double currentVal = instance.value(i);
+	        float currentVal = (float) instance.value(i);
 	        if (m_CutPoints[i] == null) {
 	          if (instance.isMissing(i)) {
 	            vals[index] = Utils.missingValue();
@@ -429,6 +429,9 @@ public abstract class MOADiscretize extends Filter {
 	              vals[index] = Utils.missingValue();
 	            } else {
 	              for (j = 0; j < m_CutPoints[i].length; j++) {
+	            	if(currentVal == 0.414912){
+	            		System.err.println("Asd");
+	            	}
 	            	float cp = (float)(Math.round((double) m_CutPoints[i][j] *1000000.0) / 1000000.0);
 	                if (currentVal <= cp) {
 	                  break;
@@ -593,7 +596,7 @@ public abstract class MOADiscretize extends Filter {
 	 * Update the discretization model without updating 
 	 * @param inst
 	 */
-	public abstract float jointProbValueClass(int attI, double rVal, int dVal, int classVal);
+	public abstract float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb);
 	public abstract int getAttValGivenClass(int attI, double rVal, int dVal, int classVal);
 	public abstract void updateEvaluator(Instance inst);
 	public abstract Instance applyDiscretization(Instance inst);

@@ -430,4 +430,17 @@ public class IFFDdiscretize extends MOADiscretize {
         //updateOutputFormat(index);
         
     }
+
+	@Override
+	public float condProbGivenClass(int attI, double rVal, int dVal,
+			int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

@@ -22,6 +22,7 @@
 package moa.reduction.bayes;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -65,7 +66,6 @@ public class OCdiscretize extends MOADiscretize{
   protected int[] phases;
   protected int initialElements = 100;
   protected int numClasses = 2;
-  private boolean created = false;
 
   /** Output binary attributes for discretized attributes. */
   protected boolean m_MakeBinary = false;
@@ -78,6 +78,7 @@ public class OCdiscretize extends MOADiscretize{
 	  totalCount = 0;
 	  trees = null;
 	  setAttributeIndices("first-last");
+	  this.provideProb = true;
   }
   
   public OCdiscretize(int numClasses, int[] attributes) {
@@ -92,7 +93,7 @@ public class OCdiscretize extends MOADiscretize{
 
   
   public Instance applyDiscretization(Instance inst) {
-	  if(created)
+	  if(m_Init)
 		  return convertInstance(inst);
 	  return inst;
   } 
@@ -112,14 +113,24 @@ public class OCdiscretize extends MOADiscretize{
 			  	if (!instance.isMissing(i)) {		  
 			  		OnlineChiMerge(i, instance); 
 			  		if(!interval_l2.get(i).isEmpty())  {
-			  			created = true;
+			  			m_Init = true;
 			  			// Transform intervals in list to a matrix
 				  		List<Interval> l = interval_l2.get(i);
 				  		TreeSet<Double> ss = new TreeSet<Double>();
 				  		for(Interval inter: l) ss.add(inter.lower);
 		  				m_CutPoints[i] = new double[ss.size()];
 		  				int j = 0;
-				  		for(Double lower: ss) m_CutPoints[i][j++] = lower;
+		  				for (Iterator iterator = ss.iterator(); iterator
+								.hasNext();) {
+							Double double1 = (Double) iterator.next();
+							
+						}
+				  		for(Double lower: ss) {
+				  			if(j > 0)
+				  				m_CutPoints[i][j-1] = lower;
+				  			j++;
+				  		}
+				  		m_CutPoints[i][j-1] = Float.POSITIVE_INFINITY;
 			  		}			  		
 			  	}  
 		  }
@@ -370,6 +381,22 @@ public class OCdiscretize extends MOADiscretize{
 	        return value == key.value && clas == key.clas;
 	    }
 
+  }
+
+
+  @Override
+  public float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
+		// TODO Auto-generated method stub
+		float joint = getAttValGivenClass(attI, rVal, dVal, classVal) / (float) totalCount;
+		return joint / classProb;
+  }
+  
+  @Override
+  public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
+	  if(dVal < interval_l2.get(attI).size()) {
+		  return interval_l2.get(attI).get(dVal).distrib[classVal];
+	  }
+	  return 0;
   }
   
 }

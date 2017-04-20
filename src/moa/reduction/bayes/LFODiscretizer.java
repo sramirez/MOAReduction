@@ -639,10 +639,10 @@ public class LFODiscretizer extends MOADiscretize {
   }
 
   @Override
-  public float jointProbValueClass(int attI, double rVal, int dVal, int classVal) {
+  public float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
 		// TODO Auto-generated method stub
-		int c = getAttValGivenClass(attI, rVal, dVal, classVal);
-		return c / (float) Utils.sum(classByAtt[attI]);
+		float joint = getAttValGivenClass(attI, rVal, dVal, classVal) / (float) Utils.sum(classByAtt[attI]);
+		return joint / classByAtt[attI][classVal];
   }
   
   @Override

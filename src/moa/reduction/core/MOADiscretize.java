@@ -429,9 +429,6 @@ public abstract class MOADiscretize extends Filter {
 	              vals[index] = Utils.missingValue();
 	            } else {
 	              for (j = 0; j < m_CutPoints[i].length; j++) {
-	            	if(currentVal == 0.414912){
-	            		System.err.println("Asd");
-	            	}
 	            	float cp = (float)(Math.round((double) m_CutPoints[i][j] *1000000.0) / 1000000.0);
 	                if (currentVal <= cp) {
 	                  break;

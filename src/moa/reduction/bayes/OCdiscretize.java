@@ -22,6 +22,7 @@
 package moa.reduction.bayes;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,7 +36,7 @@ import weka.core.Range;
 import com.yahoo.labs.samoa.instances.Instance;
 
 /**
- * Online ChiMerge Algorith<br/>
+ * Online ChiMerge Algorithm<br/>
  * <br/>
  * For more information, see:<br/>
  * <br/>
@@ -71,9 +72,8 @@ public class OCdiscretize extends MOADiscretize{
   protected boolean m_MakeBinary = false;
 
   /** Constructor - initializes the filter */
-  public OCdiscretize(int nc) {
+  public OCdiscretize() {
 	  super();
-	  this.numClasses = nc;
 	  m_DiscretizeCols = new Range();	  
 	  totalCount = 0;
 	  trees = null;
@@ -81,13 +81,13 @@ public class OCdiscretize extends MOADiscretize{
 	  this.provideProb = true;
   }
   
-  public OCdiscretize(int numClasses, int[] attributes) {
-	  this(numClasses);
+  public OCdiscretize(int[] attributes) {
+	  this();
 	  setAttributeIndicesArray(attributes);
   }
   
-  public OCdiscretize(int numClasses, int initial) {
-	  this(numClasses);
+  public OCdiscretize(int initial) {
+	  this();
 	  this.initialElements = initial;
   }
 
@@ -143,6 +143,7 @@ public class OCdiscretize extends MOADiscretize{
 
   private void initialize(Instance inst){
 	  
+	  this.numClasses = inst.numClasses();
 	  m_DiscretizeCols.setUpper(inst.numAttributes() - 1);	  
 	  trees = new ArrayList<TreeMap<Double, Bin>>(inst.numAttributes());
 	  interval_q = new ArrayList<PriorityQueue<Interval>>();
@@ -158,7 +159,7 @@ public class OCdiscretize extends MOADiscretize{
 	  for (int i = 0; i < inst.numAttributes() - 1; i++) {
 		  trees.add(new TreeMap<Double, Bin>());
 		  phases[i] = 0;
-		  interval_q.add(new PriorityQueue<Interval>());
+		  interval_q.add(new PriorityQueue<Interval>(initialElements, new desComparableInterval()));
 		  interval_l.add(new ArrayList<Interval>());
 		  interval_l2.add(new ArrayList<Interval>());
 		  example_q.add(new LinkedList<Pair>());
@@ -178,6 +179,8 @@ public class OCdiscretize extends MOADiscretize{
 	  } else if (phases[index] == 1) {		  
 		  example_q.get(index).add(new Pair(value, inst.classValue()));
 		  if(!it_bin.get(index).isEmpty()) {
+			  if(index == 5)
+				  System.err.println("asd");
 			  double key = it_bin.get(index).pollFirst();
 			  Bin cbin = trees.get(index).get(key);
 			  if(interval_l.get(index).isEmpty()){
@@ -185,11 +188,12 @@ public class OCdiscretize extends MOADiscretize{
 				  last_interval.set(index, new Interval(minus_inf, cbin.distrib));
 				  interval_l.get(index).add(last_interval.get(index));				  
 			  } else {
+				  if(index == 3)
+					  System.err.println("asd");
 				  double bound = (previous_bin.get(index).value + cbin.value) / 2;
 				  Interval new_interval = new Interval(bound, cbin.distrib);
 				  interval_l.get(index).add(new_interval);
-				  last_interval.get(index).qval = computeQ(last_interval.get(index), new_interval);
-				  
+				  last_interval.get(index).qval = computeQ(last_interval.get(index), new_interval);	  
 				  interval_q.get(index).offer(last_interval.get(index));
 				  last_interval.set(index, new_interval);				  
 			  }
@@ -197,13 +201,16 @@ public class OCdiscretize extends MOADiscretize{
 		  } else {
 			  phases[index] = 2;
 		  }
-	  } else if (phases[index] == 2) {		  
+	  } else if (phases[index] == 2) {	
+
 		  Pair pel = example_q.get(index).pollLast();		  
 		  addToMainTree(index, pel.value, pel.clas);
 		  
 		  Interval[] tmp = new Interval[interval_q.get(index).size()];
 		  Interval[] array = interval_q.get(index).toArray(tmp);
 
+		  if(index == 5)
+			  System.err.println("asd");
 		  if(array.length > 1) {
 			  Interval best = array[0]; 
 			  Interval next = array[1];
@@ -225,7 +232,9 @@ public class OCdiscretize extends MOADiscretize{
 				  interval_q.get(index).remove(prev);
 				  interval_q.get(index).offer(prev);
 			  }			  
-		  } else {		  
+		  } else {	
+			  if(index == 3)
+				  System.err.println("ads");
 			  if(interval_q.get(index).isEmpty()){
 				  Pair p = example_q.get(index).pollLast();
 				  addToMainTree(index, p.value, p.clas);
@@ -238,6 +247,8 @@ public class OCdiscretize extends MOADiscretize{
 			  }
 		  }
 	  } else { // phase = 3
+		  if(index == 5)
+			  System.err.println("asd");
 		  if(interval_l.get(index).size() > 0) {
 			  Interval e = interval_l.get(index).remove(0);
 			  interval_l2.get(index).add(e);
@@ -252,16 +263,23 @@ public class OCdiscretize extends MOADiscretize{
 	  Bin bin = trees.get(index).getOrDefault(value, new Bin(value));
 	  bin.feed((int) clas);
 	  trees.get(index).put(value, bin);
-	  it_bin.get(index).add(value);
+	  if(!it_bin.get(index).isEmpty()){
+		  if(it_bin.get(index).peekLast() != value)
+			  it_bin.get(index).add(value);
+	  } else {
+		  it_bin.get(index).add(value);
+	  }
   }
   
   private void reInit(int index){	  
-	  it_bin.get(index).addAll(index, trees.get(index).navigableKeySet());
+	  it_bin.get(index).clear(); // ?
+	  
+	  it_bin.get(index).addAll(trees.get(index).navigableKeySet());
 	  double lastKey = it_bin.get(index).peekLast();
 	  previous_bin.set(index, trees.get(index).get(lastKey));
 	  int tam = trees.get(index).size() - 1;
 	  if(tam < 1) tam = 1; 
-	  interval_q.set(index, new PriorityQueue<Interval>(tam));
+	  interval_q.set(index, new PriorityQueue<Interval>(tam, new desComparableInterval()));
 	  phases[index] = 1;
   }
   
@@ -330,7 +348,7 @@ public class OCdiscretize extends MOADiscretize{
 	    float qval;
 	    
 	    public Interval(){
-	    	this(Double.NEGATIVE_INFINITY, new int[1]);
+	    	this(Double.NEGATIVE_INFINITY, new int[numClasses]);
 	    }
 
 	    public Interval(double lower, int[] distr) {
@@ -382,7 +400,16 @@ public class OCdiscretize extends MOADiscretize{
 	    }
 
   }
+  
+  class desComparableInterval implements Comparator<Interval> {
 
+	  @Override
+	  public int compare(Interval o1, Interval o2) {
+			// TODO Auto-generated method stub
+			return -1 * Float.compare(o1.qval, o2.qval);
+		}
+	  
+  }
 
   @Override
   public float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {

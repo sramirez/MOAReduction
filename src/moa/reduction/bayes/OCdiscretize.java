@@ -78,7 +78,7 @@ public class OCdiscretize extends MOADiscretize{
 	  totalCount = 0;
 	  trees = null;
 	  setAttributeIndices("first-last");
-	  this.provideProb = true;
+	  this.provideProb = false;
   }
   
   public OCdiscretize(int[] attributes) {
@@ -179,8 +179,6 @@ public class OCdiscretize extends MOADiscretize{
 	  } else if (phases[index] == 1) {		  
 		  example_q.get(index).add(new Pair(value, inst.classValue()));
 		  if(!it_bin.get(index).isEmpty()) {
-			  if(index == 5)
-				  System.err.println("asd");
 			  double key = it_bin.get(index).pollFirst();
 			  Bin cbin = trees.get(index).get(key);
 			  if(interval_l.get(index).isEmpty()){
@@ -188,8 +186,6 @@ public class OCdiscretize extends MOADiscretize{
 				  last_interval.set(index, new Interval(minus_inf, cbin.distrib));
 				  interval_l.get(index).add(last_interval.get(index));				  
 			  } else {
-				  if(index == 3)
-					  System.err.println("asd");
 				  double bound = (previous_bin.get(index).value + cbin.value) / 2;
 				  Interval new_interval = new Interval(bound, cbin.distrib);
 				  interval_l.get(index).add(new_interval);
@@ -209,8 +205,6 @@ public class OCdiscretize extends MOADiscretize{
 		  Interval[] tmp = new Interval[interval_q.get(index).size()];
 		  Interval[] array = interval_q.get(index).toArray(tmp);
 
-		  if(index == 5)
-			  System.err.println("asd");
 		  if(array.length > 1) {
 			  Interval best = array[0]; 
 			  Interval next = array[1];
@@ -220,21 +214,18 @@ public class OCdiscretize extends MOADiscretize{
 			  
 			  if(interval_l.get(index).size() > 2){ // There are more elements
 				  next = array[2];
-				  best.qval = computeQ(best, next);
 				  interval_q.get(index).remove(best);
+				  best.qval = computeQ(best, next);
 				  interval_q.get(index).offer(best);
 			  }
 			  
 			  if(!best.equals(interval_l.get(index).get(0))) {
 				  Interval prev = array[array.length - 1];
-				  prev.qval = computeQ(prev, best);
-
 				  interval_q.get(index).remove(prev);
+				  prev.qval = computeQ(prev, best);
 				  interval_q.get(index).offer(prev);
 			  }			  
 		  } else {	
-			  if(index == 3)
-				  System.err.println("ads");
 			  if(interval_q.get(index).isEmpty()){
 				  Pair p = example_q.get(index).pollLast();
 				  addToMainTree(index, p.value, p.clas);
@@ -247,8 +238,6 @@ public class OCdiscretize extends MOADiscretize{
 			  }
 		  }
 	  } else { // phase = 3
-		  if(index == 5)
-			  System.err.println("asd");
 		  if(interval_l.get(index).size() > 0) {
 			  Interval e = interval_l.get(index).remove(0);
 			  interval_l2.get(index).add(e);

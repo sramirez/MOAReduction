@@ -379,10 +379,20 @@ public class PIDdiscretize extends MOADiscretize {
 
 
   @Override
-  public float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
+  public Float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
 		// TODO Auto-generated method stub
-		float joint = getAttValGivenClass(attI, rVal, dVal, classVal) / (float) totalCount;
-		return joint / classProb;
+	  	float joint = getAttValGivenClass(attI, rVal, dVal, classVal);
+	  	if(joint > 0 && classProb > 0) {
+			joint /= totalCount;
+			return joint / classProb;
+	  	}
+	  	return null;
+  }
+  
+  public Float condProbGivenClass(int attI, double rVal, int dVal, int classVal, int classCount) {
+		// TODO Auto-generated method stub
+	  	float joint = getAttValGivenClass(attI, rVal, dVal, classVal);		
+	  	return (joint + 1.0f) / (classCount + m_Distrib2.get(attI).size());
   }
   
   @Override

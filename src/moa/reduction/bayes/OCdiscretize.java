@@ -401,7 +401,7 @@ public class OCdiscretize extends MOADiscretize{
   }
 
   @Override
-  public float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
+  public Float condProbGivenClass(int attI, double rVal, int dVal, int classVal, float classProb) {
 		// TODO Auto-generated method stub
 		float joint = getAttValGivenClass(attI, rVal, dVal, classVal) / (float) totalCount;
 		return joint / classProb;
@@ -414,5 +414,12 @@ public class OCdiscretize extends MOADiscretize{
 	  }
 	  return 0;
   }
+
+@Override
+public Float condProbGivenClass(int attI, double rVal, int dVal, int classVal,
+		int classCount) {
+	// TODO Auto-generated method stub
+	return null;
+}
   
 }

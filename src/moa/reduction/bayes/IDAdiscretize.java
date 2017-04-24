@@ -195,9 +195,16 @@ public class IDAdiscretize extends MOADiscretize {
 	}
 
 	@Override
-	public float condProbGivenClass(int attI, double rVal, int dVal,
+	public Float condProbGivenClass(int attI, double rVal, int dVal,
 			int classVal, float classProb) {
 		// TODO Auto-generated method stub
-		return 0;
+		return null;
+	}
+
+	@Override
+	public Float condProbGivenClass(int attI, double rVal, int dVal,
+			int classVal, int classCount) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

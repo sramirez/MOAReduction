@@ -120,8 +120,8 @@ public class PIDdiscretize extends MOADiscretize {
 		  m_Init = true;
 	  }
 
-	 if(totalCount % 101 == 0) 
-		 writeCPointsToFile(1, 2, totalCount, "PiD");
+	 //if(totalCount % 101 == 0) 
+		 //writeCPointsToFile(1, 2, totalCount, "PiD");
   }
   
   private void initializeLayers(Instance inst){
@@ -397,6 +397,8 @@ public class PIDdiscretize extends MOADiscretize {
   
   @Override
   public int getAttValGivenClass(int attI, double rVal, int dVal, int classVal) {
-	  return m_Distrib2.get(attI).get(dVal).getOrDefault(classVal, 0.0f).intValue();
+	  if(dVal < m_Distrib2.get(attI).size())
+		  return m_Distrib2.get(attI).get(dVal).getOrDefault(classVal, 0.0f).intValue();
+	  return 0;
   }
 }

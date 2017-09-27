@@ -80,7 +80,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. LOFD", 5, 0, 5);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. LOFD", 1, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 5000, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
@@ -169,6 +169,12 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
                         obs = att.isNominal() ? newNominalClassObserver()
                                 : newNumericClassObserver();
                         this.attributeObservers.set(i, obs);
+                    }
+                    // Problem with spam assasin and poker
+                    double value = rinst.value(instAttIndex);
+                    if(rinst.value(instAttIndex) == -1) {
+                    	System.out.println("Value changed");
+                    	value = 0;            	
                     }
                     obs.observeAttributeClass(rinst.value(instAttIndex), (int) rinst.classValue(), rinst.weight());
         		}

@@ -15,7 +15,7 @@ import moa.classifiers.meta.FISH;
 import moa.core.InstanceExample;
 import moa.core.TimingUtils;
 import moa.reduction.core.NaiveBayesDiscretization;
-import moa.reduction.core.NaiveBayesReduction;
+import moa.reduction.core.ReductionClassifier;
 import moa.streams.ArffFileStream;
 import moa.streams.generators.RandomRBFGenerator;
 

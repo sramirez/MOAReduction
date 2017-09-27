@@ -19,21 +19,15 @@
  */
 package moa.reduction.core;
 
-
-//import weka.attributeSelection.InfoGainAttributeEval; 
-//import weka.attributeSelection.Ranker;
-//import weka.attributeSelection.AttributeSelection;
 import weka.attributeSelection.*; 
 import moa.classifiers.AbstractClassifier;
+import moa.classifiers.bayes.NaiveBayesMultinomial;
 import moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
-import moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
-import moa.classifiers.core.attributeclassobservers.NominalAttributeClassObserver;
-import moa.classifiers.core.attributeclassobservers.NumericAttributeClassObserver;
+import moa.classifiers.functions.SGDMultiClass;
 import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
-import moa.core.TimingUtils;
 import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
@@ -52,21 +46,14 @@ import com.yahoo.labs.samoa.instances.Instance;
 import weka.core.Attribute;
 
 /**
- * Naive Bayes incremental learner.
+ * Wrapper classifier with several preprocessing methods.
  *
- * <p>Performs classic bayesian prediction while making naive assumption that
- * all inputs are independent.<br /> Naive Bayes is a classiﬁer algorithm known
- * for its simplicity and low computational cost. Given n different classes, the
- * trained Naive Bayes classiﬁer predicts for every unlabelled instance I the
- * class C to which it belongs with high accuracy.</p>
- *
- * <p>Parameters:</p> <ul> <li>-r : Seed for random behaviour of the
- * classifier</li> </ul>
- *
- * @author Richard Kirkby (rkirkby@cs.waikato.ac.nz)
- * @version $Revision: 7 $
+ * <p>Performs classic bayesian prediction or multinomial SGD-based linear classification.
+ * 
+ * @author Sergio Ramirez (sramirez@decsai.ugr.es)
+ * @version $Revision: 2 $
  */
-public class NaiveBayesReduction extends AbstractClassifier {
+public class ReductionClassifier extends AbstractClassifier {
 
     private static final long serialVersionUID = 1L;
 
@@ -93,13 +80,27 @@ public class NaiveBayesReduction extends AbstractClassifier {
     public static IntOption maxLabelsOption = new IntOption("maxLabels", 'l', 
     		"Number of different labels to use in discretization", 10000, 10, Integer.MAX_VALUE); 
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
-    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
+    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);   
+    public IntOption baseClassifier = new IntOption("baseClassifier", 'b', 
+    		"Base classifier to be used: 0. Multinomial NB 1. LR (SGD Multiclass).", 0, 0, 1); 
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
     protected int totalCount = 0, classified = 0, correctlyClassified = 0;
     protected Set<Integer> selectedFeatures = new HashSet<Integer>();
+    protected AbstractClassifier wrapperClassifier;
 	//private double sumTime, sumTime2;
+    
+    public ReductionClassifier() {
+		// TODO Auto-generated constructor stub
+    	if(baseClassifier.getValue() == 0){
+    		wrapperClassifier = new NaiveBayesMultinomial();
+    	} else {
+    		SGDMultiClass tmp = new SGDMultiClass();
+    		tmp.setLossFunction(2);
+    		wrapperClassifier = tmp;
+    	}
+    }
     
     @Override
     public void resetLearningImpl() {
@@ -124,9 +125,6 @@ public class NaiveBayesReduction extends AbstractClassifier {
     	    	}
     		}
     		try {
-    			if(inst == null) {
-    				System.err.println("Error: null instance");
-    			}
 				fselector.updateEvaluator(inst);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
@@ -160,27 +158,9 @@ public class NaiveBayesReduction extends AbstractClassifier {
     		rinst = discretizer.applyDiscretization(inst);
     	}
 
-		  //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
-    	
-        this.observedClassDistribution.addToValue((int) rinst.classValue(), rinst.weight());
-        for (int i = 0; i < rinst.numAttributes() - 1; i++) {
-            int instAttIndex = modelAttIndexToInstanceAttIndex(i, rinst);
-            AttributeClassObserver obs = this.attributeObservers.get(i);
-            com.yahoo.labs.samoa.instances.Attribute att = rinst.attribute(instAttIndex);
-            if (obs == null || (att.isNominal() && obs instanceof NumericAttributeClassObserver)) {
-                obs = att.isNominal() ? newNominalClassObserver()
-                        : newNumericClassObserver();
-                this.attributeObservers.set(i, obs);
-            }
-            
-            // Problem with spam assasin
-            double value = rinst.value(instAttIndex);
-            if(rinst.value(instAttIndex) == -1) {
-            	System.out.println("Value changed");
-            	value = 0;            	
-            }
-            obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
-        }
+	    //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
+    	wrapperClassifier.trainOnInstanceImpl(rinst);
+        
         
         totalCount++;
         //if(totalCount == 50000)
@@ -190,7 +170,7 @@ public class NaiveBayesReduction extends AbstractClassifier {
     @Override
     public double[] getVotesForInstance(Instance inst) {
 
-
+    	// Profiling
     	/*long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
 		double[] prediction = doNaiveBayesPrediction(inst, this.observedClassDistribution,
 				this.attributeObservers);
@@ -200,8 +180,29 @@ public class NaiveBayesReduction extends AbstractClassifier {
 	        if(totalCount == 49999)
 	        	System.out.println("Total time: " + sumTime2);
         return prediction;*/
-    	return doNaiveBayesPrediction(inst, this.observedClassDistribution,
-				this.attributeObservers);
+    	// Feature selection process performed before
+    	
+    	Instance sinst = inst.copy();
+    	if(fsmethodOption.getValue() != 0 && fselector != null) 
+    		performFS(sinst);
+    	if(discmethodOption.getValue() != 0 && discretizer != null) 
+    		sinst = discretizer.applyDiscretization(sinst);
+    	
+    	
+    	double[] finalVotes = wrapperClassifier.getVotesForInstance(inst);
+    	
+        double maxValue = Integer.MIN_VALUE;
+        int maxIndex = Integer.MIN_VALUE;
+        for (int i = 0; i < finalVotes.length; i++) {
+			if(finalVotes[i] > maxValue){
+				maxIndex = i;
+				maxValue = finalVotes[i];
+			}
+		}
+        if(maxIndex == inst.classIndex())
+        	correctlyClassified++;
+        classified++;
+        return finalVotes;
     }
 
     @Override
@@ -210,42 +211,14 @@ public class NaiveBayesReduction extends AbstractClassifier {
     }
 
     @Override
-    public void getModelDescription(StringBuilder out, int indent) {
-        for (int i = 0; i < this.observedClassDistribution.numValues(); i++) {
-            StringUtils.appendIndented(out, indent, "Observations for ");
-            out.append(getClassNameString());
-            out.append(" = ");
-            out.append(getClassLabelString(i));
-            out.append(":");
-            StringUtils.appendNewlineIndented(out, indent + 1,
-                    "Total observed weight = ");
-            out.append(this.observedClassDistribution.getValue(i));
-            out.append(" / prob = ");
-            out.append(this.observedClassDistribution.getValue(i)
-                    / this.observedClassDistribution.sumOfValues());
-            for (int j = 0; j < this.attributeObservers.size(); j++) {
-                StringUtils.appendNewlineIndented(out, indent + 1,
-                        "Observations for ");
-                out.append(getAttributeNameString(j));
-                out.append(": ");
-                // TODO: implement observer output
-                out.append(this.attributeObservers.get(j));
-            }
-            StringUtils.appendNewline(out);
-        }
+    public void getModelDescription(StringBuilder result, int indent) {
+        StringUtils.appendIndented(result, indent, toString());
+        StringUtils.appendNewline(result);
     }
 
     @Override
     public boolean isRandomizable() {
         return false;
-    }
-
-    protected AttributeClassObserver newNominalClassObserver() {
-        return new NominalAttributeClassObserver();
-    }
-
-    protected AttributeClassObserver newNumericClassObserver() {
-        return new GaussianNumericAttributeClassObserver();
     }
     
     private void performFS(Instance rinst) {
@@ -283,83 +256,5 @@ public class NaiveBayesReduction extends AbstractClassifier {
 				}
 			}
     	}
-    }
-
-    public double[] doNaiveBayesPrediction(Instance inst,
-            DoubleVector observedClassDistribution,
-            AutoExpandVector<AttributeClassObserver> attributeObservers) {
-    	
-    	// Feature selection process performed before
-    	Instance sinst = inst.copy();
-    	if(fsmethodOption.getValue() != 0 && fselector != null) 
-    		performFS(sinst);
-    	if(discmethodOption.getValue() != 0 && discretizer != null) 
-    		sinst = discretizer.applyDiscretization(sinst);
-		
-		// Naive Bayes predictions
-        double[] votes = new double[observedClassDistribution.numValues()];
-        double observedClassSum = observedClassDistribution.sumOfValues();
-        for (int classIndex = 0; classIndex < votes.length; classIndex++) {
-            votes[classIndex] = observedClassDistribution.getValue(classIndex)
-                    / observedClassSum;
-            for (int attIndex = 0; attIndex < sinst.numAttributes() - 1; attIndex++) {
-            	if(selectedFeatures.isEmpty() || selectedFeatures.contains(attIndex)) {
-	                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,sinst);
-	                AttributeClassObserver obs = attributeObservers.get(attIndex);
-	                if ((obs != null) && !sinst.isMissing(instAttIndex)) {
-	                	votes[classIndex] *= obs.probabilityOfAttributeValueGivenClass(
-	                			sinst.value(instAttIndex), classIndex);
-	                }
-            	}
-            }
-        }
-        // TODO: need logic to prevent underflow?
-        // Compute some statistics about classification performance
-        double maxValue = -1;
-        int maxIndex = -1;
-        for (int i = 0; i < votes.length; i++) {
-			if(votes[i] > maxValue){
-				maxIndex = i;
-				maxValue = votes[i];
-			}
-		}
-        if(maxIndex == inst.classIndex())
-        	correctlyClassified++;
-        classified++;
-        return votes;
-    }
-
-    // Naive Bayes Prediction using log10 for VFDR rules 
-    public double[] doNaiveBayesPredictionLog(Instance inst,
-            DoubleVector observedClassDistribution,
-            AutoExpandVector<AttributeClassObserver> observers, AutoExpandVector<AttributeClassObserver> observers2) {
-    	
-    	Instance rinst = inst.copy();
-    	// Feature selection process performed before
-    	performFS(rinst);
-    	
-        AttributeClassObserver obs;
-        double[] votes = new double[observedClassDistribution.numValues()];
-        double observedClassSum = observedClassDistribution.sumOfValues();
-        for (int classIndex = 0; classIndex < votes.length; classIndex++) {
-            votes[classIndex] = Math.log10(observedClassDistribution.getValue(classIndex)
-                    / observedClassSum);
-            for (int attIndex = 0; attIndex < rinst.numAttributes() - 1; attIndex++) {
-                int instAttIndex = modelAttIndexToInstanceAttIndex(attIndex,
-                       rinst);
-                if (rinst.attribute(instAttIndex).isNominal()) {
-                    obs = observers.get(attIndex);
-                } else {
-                    obs = observers2.get(attIndex);
-                }
-
-                if ((obs != null) && !rinst.isMissing(instAttIndex)) {
-                    votes[classIndex] += Math.log10(obs.probabilityOfAttributeValueGivenClass(rinst.value(instAttIndex), classIndex));
-
-                }
-            }
-        }
-        return votes;
-
     }
 }

@@ -24,6 +24,7 @@ package moa.reduction.bayes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -204,7 +205,16 @@ public class PIDdiscretize extends MOADiscretize {
 		  intervals.add(interv);
 		  interv = new HashMap<Integer, Float>();			
 	  }	
-	  m_Distrib2.set(att, intervals);
+	  /*int sum = 0;
+	  for (Iterator iterator = intervals.iterator(); iterator.hasNext();) {
+		Map<Integer,Float> map = (Map<Integer,Float>) iterator.next();
+		for (Iterator iterator2 = map.values().iterator(); iterator2.hasNext();) {
+			Float e = (Float) iterator2.next();
+			sum += e;			
+		}		
+	  }*/
+	  
+	m_Distrib2.set(att, intervals);
   }
   
   private void initL2FromL1() {

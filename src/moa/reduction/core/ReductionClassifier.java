@@ -42,6 +42,7 @@ import java.util.Set;
 
 import com.github.javacliparser.IntOption;
 import com.yahoo.labs.samoa.instances.Instance;
+import com.yahoo.labs.samoa.instances.WekaToSamoaInstanceConverter;
 
 import weka.core.Attribute;
 
@@ -59,7 +60,7 @@ public class ReductionClassifier extends AbstractClassifier {
 
     @Override
     public String getPurposeString() {
-        return "Naive Bayes classifier with feature selection: performs classic bayesian prediction while making naive assumption that all inputs are independent.";
+        return "Wrapper classifier with several preprocessing methods: up to date, only multinomial NB and SGD logistic regresion are considered.";
     }
     protected DoubleVector observedClassDistribution;
     protected static AttributeSelection selector = null;
@@ -157,8 +158,8 @@ public class ReductionClassifier extends AbstractClassifier {
     		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());	
     		rinst = discretizer.applyDiscretization(inst);
     	}
-
-	    //sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
+    	
+    	//sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
     	wrapperClassifier.trainOnInstanceImpl(rinst);
         
         
@@ -184,12 +185,12 @@ public class ReductionClassifier extends AbstractClassifier {
     	
     	Instance sinst = inst.copy();
     	if(fsmethodOption.getValue() != 0 && fselector != null) 
-    		performFS(sinst);
+    		sinst = performFS(sinst);
     	if(discmethodOption.getValue() != 0 && discretizer != null) 
     		sinst = discretizer.applyDiscretization(sinst);
     	
     	
-    	double[] finalVotes = wrapperClassifier.getVotesForInstance(inst);
+    	double[] finalVotes = wrapperClassifier.getVotesForInstance(sinst);
     	
         double maxValue = Integer.MIN_VALUE;
         int maxIndex = Integer.MIN_VALUE;
@@ -221,7 +222,7 @@ public class ReductionClassifier extends AbstractClassifier {
         return false;
     }
     
-    private void performFS(Instance rinst) {
+    private Instance performFS(Instance rinst) {
     	// Feature selection process performed before
 		weka.core.Instance winst = new weka.core.DenseInstance(rinst.weight(), rinst.toDoubleArray());
 		
@@ -250,11 +251,14 @@ public class ReductionClassifier extends AbstractClassifier {
 					selectedFeatures.clear();
 					for(int att : selector.selectedAttributes())
 						selectedFeatures.add(att);
+					WekaToSamoaInstanceConverter convWS = new WekaToSamoaInstanceConverter();
+					return convWS.samoaInstance(selector.reduceDimensionality(winst));
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
     	}
+		return rinst;
     }
 }

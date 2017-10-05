@@ -83,7 +83,7 @@ public class ReductionClassifier extends AbstractClassifier {
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
     		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);   
     public IntOption baseClassifier = new IntOption("baseClassifier", 'b', 
-    		"Base classifier to be used: 0. Multinomial NB 1. LR (SGD Multiclass) 2. Hoeffding Tree", 2, 0, 2); 
+    		"Base classifier to be used: 0. Multinomial NB 1. LR (SGD Multiclass) 2. Hoeffding Tree", 0, 0, 2); 
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;

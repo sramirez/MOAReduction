@@ -21,11 +21,11 @@ package moa.reduction.core;
 
 import weka.attributeSelection.*; 
 import moa.classifiers.AbstractClassifier;
-import moa.classifiers.bayes.NaiveBayesMultinomial;
+import moa.classifiers.bayes.NaiveBayes;
 import moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import moa.classifiers.functions.SGDMultiClass;
+import moa.classifiers.trees.HoeffdingTree;
 import moa.core.AutoExpandVector;
-import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
 import moa.reduction.bayes.IDAdiscretize;
@@ -62,7 +62,7 @@ public class ReductionClassifier extends AbstractClassifier {
     public String getPurposeString() {
         return "Wrapper classifier with several preprocessing methods: up to date, only multinomial NB and SGD logistic regresion are considered.";
     }
-    protected DoubleVector observedClassDistribution;
+    
     protected static AttributeSelection selector = null;
     protected AutoExpandVector<AttributeClassObserver> attributeObservers;
 
@@ -71,7 +71,7 @@ public class ReductionClassifier extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 4, 0, 5);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. RebDiscretize", 5, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 5000, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
@@ -83,7 +83,7 @@ public class ReductionClassifier extends AbstractClassifier {
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
     		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);   
     public IntOption baseClassifier = new IntOption("baseClassifier", 'b', 
-    		"Base classifier to be used: 0. Multinomial NB 1. LR (SGD Multiclass).", 1, 0, 1); 
+    		"Base classifier to be used: 0. Multinomial NB 1. LR (SGD Multiclass) 2. Hoeffding Tree", 2, 0, 2); 
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
@@ -95,18 +95,20 @@ public class ReductionClassifier extends AbstractClassifier {
     public ReductionClassifier() {
 		// TODO Auto-generated constructor stub
     	if(baseClassifier.getValue() == 0){
-    		wrapperClassifier = new NaiveBayesMultinomial();
-    	} else {
+    		wrapperClassifier = new NaiveBayes();
+    	} else if (baseClassifier.getValue() == 1){
     		SGDMultiClass tmp = new SGDMultiClass();
-    		tmp.setLossFunction(2);
+    		tmp.setLossFunction(1);
     		wrapperClassifier = tmp;
+        	wrapperClassifier.resetLearningImpl();
+    	} else {
+    		wrapperClassifier = new HoeffdingTree();
+    		//wrapperClassifier.resetLearningImpl();
     	}
-    	wrapperClassifier.resetLearningImpl();
     }
     
     @Override
     public void resetLearningImpl() {
-	    this.observedClassDistribution = new DoubleVector();
         this.attributeObservers = new AutoExpandVector<AttributeClassObserver>();
         totalCount = 0; classified = 0; correctlyClassified = 0;
     }
@@ -149,14 +151,16 @@ public class ReductionClassifier extends AbstractClassifier {
     	    		discretizer = new IDAdiscretize();
     	    	} else {
     	    		discretizer = new LFODiscretizer(winSizeOption.getValue(), 
-    	    				thresholdOption.getValue(), decimalsOption.getValue(), maxLabelsOption.getValue());
+    	    				thresholdOption.getValue(), decimalsOption.getValue(), 
+    	    				maxLabelsOption.getValue());
     	    	}
     		} else {
-
     			discretizer.updateEvaluator(inst);
+    			if(totalCount == thresholdOption.getValue() + 1)
+    				wrapperClassifier.resetLearningImpl();
 
     		}
-    		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());	
+    		//System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());	
     		rinst = discretizer.applyDiscretization(inst);
     	}
     	

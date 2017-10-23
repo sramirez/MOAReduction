@@ -28,6 +28,7 @@ import moa.classifiers.trees.HoeffdingTree;
 import moa.core.AutoExpandVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
+import moa.core.TimingUtils;
 import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
@@ -104,7 +105,7 @@ public class ReductionClassifier extends AbstractClassifier {
         	wrapperClassifier.resetLearningImpl();
     	} else {
     		wrapperClassifier = new HoeffdingTree();
-    		//wrapperClassifier.resetLearningImpl();
+    		wrapperClassifier.resetLearningImpl();
     	}
     }
     
@@ -116,8 +117,8 @@ public class ReductionClassifier extends AbstractClassifier {
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
-    	
-    	Instance rinst = inst.copy();
+
+        Instance rinst = inst.copy();
     	// Update the FS evaluator (no selection is applied here)
     	if(fsmethodOption.getValue() != 0) {
     		if(fselector == null) {
@@ -166,27 +167,20 @@ public class ReductionClassifier extends AbstractClassifier {
     	}
     	
     	//sumTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
-    	wrapperClassifier.trainOnInstanceImpl(rinst);
-        
-        
-        totalCount++;
+        for (int i = 0; i < rinst.numAttributes() - 1; i++) {
+        	if(rinst.value(i) == -1) {
+            	System.out.println("Value changed");
+            	rinst.setValue(i, 0);            	
+            }
+		}
+        wrapperClassifier.trainOnInstance(rinst);
+    	totalCount++;
         //if(totalCount == 50000)
         	//System.out.println("Total time: " + sumTime);
     }
 
     @Override
     public double[] getVotesForInstance(Instance inst) {
-
-    	// Profiling
-    	/*long evaluateStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
-		double[] prediction = doNaiveBayesPrediction(inst, this.observedClassDistribution,
-				this.attributeObservers);
-
-		  sumTime2 += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - evaluateStartTime);
-
-	        if(totalCount == 49999)
-	        	System.out.println("Total time: " + sumTime2);
-        return prediction;*/
     	// Feature selection process performed before
     	
     	Instance sinst = inst.copy();
@@ -194,7 +188,6 @@ public class ReductionClassifier extends AbstractClassifier {
     		sinst = performFS(sinst);
     	if(discmethodOption.getValue() != 0 && discretizer != null) 
     		sinst = discretizer.applyDiscretization(sinst);
-    	
     	
     	double[] finalVotes = wrapperClassifier.getVotesForInstance(sinst);
     	

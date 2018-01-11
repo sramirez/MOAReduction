@@ -35,6 +35,7 @@ import moa.core.AutoExpandVector;
 import moa.core.DoubleVector;
 import moa.core.Measurement;
 import moa.core.StringUtils;
+import moa.core.TimingUtils;
 import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
@@ -80,7 +81,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     public static IntOption fsmethodOption = new IntOption("fsMethod", 'm', 
     		"Infotheoretic method to be used in feature selection: 0. No method. 1. InfoGain 2. Symmetrical Uncertainty 3. OFSGD", 0, 0, 3);
     public static IntOption discmethodOption = new IntOption("discMethod", 'd', 
-    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. LOFD", 5, 0, 5);
+    		"Discretization method to be used: 0. No method. 1. PiD 2. IFFD 3. Online Chi-Merge 4. IDA 5. LOFD", 1, 0, 5);
     public static IntOption winSizeOption = new IntOption("winSize", 'w', 
     		"Window size for model updates", 5000, 1, Integer.MAX_VALUE);  
     public static IntOption thresholdOption = new IntOption("threshold", 't', 
@@ -90,7 +91,8 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     public static IntOption maxLabelsOption = new IntOption("maxLabels", 'l', 
     		"Number of different labels to use in discretization", 10000, 10, Integer.MAX_VALUE); 
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
-    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);      
+    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE); 
+    protected long trainTotalTime = 0, predictTotalTime = 0;
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
@@ -107,6 +109,8 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
 
     @Override
     public void trainOnInstanceImpl(Instance inst) {
+    	
+    	long trainStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
     	
     	Instance rinst = inst.copy();
     	// Update the FS evaluator (no selection is applied here)
@@ -169,13 +173,21 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
                         obs = att.isNominal() ? newNominalClassObserver()
                                 : newNumericClassObserver();
                         this.attributeObservers.set(i, obs);
+                    }                    
+
+                    // Problem with spam assasin
+                    double value = rinst.value(instAttIndex);
+                    if(rinst.value(instAttIndex) == -1) {
+                    	System.out.println("Value changed");
+                    	value = 0;            	
                     }
-                    obs.observeAttributeClass(rinst.value(instAttIndex), (int) rinst.classValue(), rinst.weight());
+                    obs.observeAttributeClass(value, (int) rinst.classValue(), rinst.weight());
         		}
         }                
         totalCount++;
-        //if(totalCount == 50000)
-        	//System.out.println("Total time: " + sumTime);
+        trainTotalTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - trainStartTime);
+        if(totalCount == 10000)
+            	System.out.println("Partial train time: " + trainTotalTime);
     }
     
     private boolean discretizedAttribute(int attIndex){
@@ -185,8 +197,14 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
 
     @Override
     public double[] getVotesForInstance(Instance inst) {
-    	return doNaiveBayesPrediction(inst, this.observedClassDistribution,
+
+    	long predictStartTime = TimingUtils.getNanoCPUTimeOfCurrentThread();
+    	double[] out = doNaiveBayesPrediction(inst, this.observedClassDistribution,
 				this.attributeObservers);
+    	predictTotalTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - predictStartTime);
+    	if(totalCount == 10000)
+        	System.out.println("Partial prediction time: " + predictTotalTime);
+    	return out; 
     }
 
     @Override

@@ -91,8 +91,10 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     public static IntOption maxLabelsOption = new IntOption("maxLabels", 'l', 
     		"Number of different labels to use in discretization", 10000, 10, Integer.MAX_VALUE); 
     public IntOption numClassesOption = new IntOption("numClasses", 'c', 
-    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE); 
-    protected long trainTotalTime = 0, predictTotalTime = 0;
+    		"Number of classes for this problem (Online Chi-Merge)", 100, 1, Integer.MAX_VALUE);
+    public static IntOption histogramOption = new IntOption("histogram", 'h', 
+    		"Whether histogram statistics are provided directly to learner", 0, 0, 1); 
+    protected double trainTotalTime = 0, predictTotalTime = 0;
     
     protected static MOAAttributeEvaluator fselector = null;
     protected static MOADiscretize discretizer = null;
@@ -157,7 +159,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     			discretizer.updateEvaluator(inst);
 
     		}
-    		System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());	
+    		//System.out.println("Number of new intervals: " + discretizer.getNumberIntervals());	
     		rinst = discretizer.applyDiscretization(inst);
     	}
 
@@ -186,13 +188,13 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
         }                
         totalCount++;
         trainTotalTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - trainStartTime);
-        if(totalCount == 10000)
+        if(totalCount % 1000 == 0)
             	System.out.println("Partial train time: " + trainTotalTime);
     }
     
     private boolean discretizedAttribute(int attIndex){
     	return discretizer != null && discretizer.m_Init &&
-    			discretizer.m_CutPoints[attIndex] != null && discretizer.provideProb;
+    			discretizer.m_CutPoints[attIndex] != null && histogramOption.getValue() == 1; //discretizer.provideProb;
     }
 
     @Override
@@ -202,7 +204,7 @@ public class NaiveBayesDiscretization extends AbstractClassifier {
     	double[] out = doNaiveBayesPrediction(inst, this.observedClassDistribution,
 				this.attributeObservers);
     	predictTotalTime += TimingUtils.nanoTimeToSeconds(TimingUtils.getNanoCPUTimeOfCurrentThread() - predictStartTime);
-    	if(totalCount == 10000)
+    	if(totalCount % 1000 == 0)
         	System.out.println("Partial prediction time: " + predictTotalTime);
     	return out; 
     }

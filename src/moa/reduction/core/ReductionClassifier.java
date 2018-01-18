@@ -32,7 +32,7 @@ import moa.core.TimingUtils;
 import moa.reduction.bayes.IDAdiscretize;
 import moa.reduction.bayes.IFFDdiscretize;
 import moa.reduction.bayes.IncrInfoThAttributeEval;
-import moa.reduction.bayes.LFODiscretizer;
+import moa.reduction.bayes.LOFDiscretizer;
 import moa.reduction.bayes.OCdiscretize;
 import moa.reduction.bayes.OFSGDAttributeEval;
 import moa.reduction.bayes.PIDdiscretize;
@@ -152,7 +152,7 @@ public class ReductionClassifier extends AbstractClassifier {
     	    	} else if(discmethodOption.getValue() == 4){
     	    		discretizer = new IDAdiscretize();
     	    	} else {
-    	    		discretizer = new LFODiscretizer(winSizeOption.getValue(), 
+    	    		discretizer = new LOFDiscretizer(winSizeOption.getValue(), 
     	    				thresholdOption.getValue(), decimalsOption.getValue(), 
     	    				maxLabelsOption.getValue());
     	    	}

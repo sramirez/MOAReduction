@@ -21,7 +21,7 @@ import moa.reduction.core.MOADiscretize;
 import com.yahoo.labs.samoa.instances.Instance;
 
 /**
- * Local Fusion Online Discretizer<br/>
+ * Local Online Fusion Discretizer<br/>
  * <br/>
  * <br/>
  * An online discretizer that fuse intervals locally using a measure based on quadratic entropy.<br/>
@@ -30,7 +30,7 @@ import com.yahoo.labs.samoa.instances.Instance;
  * @author Sergio Ramírez (sramirez at decsai dot ugr dot es)
  */
 
-public class LFODiscretizer extends MOADiscretize {
+public class LOFDiscretizer extends MOADiscretize {
 	
 	/**
 	 * 
@@ -54,7 +54,7 @@ public class LFODiscretizer extends MOADiscretize {
 	 * Default constructor. Parameters has been set to 
 	 * the best configuration according to the authors.
 	 */
-	public LFODiscretizer() {
+	public LOFDiscretizer() {
 		// TODO Auto-generated constructor stub
 		setAttributeIndices("first-last");
 		this.alpha = 0.5f;
@@ -73,7 +73,7 @@ public class LFODiscretizer extends MOADiscretize {
 	 * @param decimals Number of decimals used to round points.
 	 * @param maxLabels Maximum number of labels to used in queues.
 	 */
-	public LFODiscretizer(int maxhist, int initTh, int decimals, int maxLabels) {
+	public LOFDiscretizer(int maxhist, int initTh, int decimals, int maxLabels) {
 		this();
 		this.initTh = initTh;
 		this.decimals = decimals;

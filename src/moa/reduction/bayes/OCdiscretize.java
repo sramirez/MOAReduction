@@ -137,8 +137,8 @@ public class OCdiscretize extends MOADiscretize{
 	  }
 	  
 
-	 if(totalCount % 101 == 0) 
-		 writeCPointsToFile(1, 2, totalCount, "OC");
+	 /*if(totalCount % 101 == 0) 
+		 writeCPointsToFile(1, 2, totalCount, "OC");*/
   }
 
   private void initialize(Instance inst){

@@ -111,8 +111,8 @@ public class IDAdiscretize extends MOADiscretize {
 			updateWindowSample(inst);
 		}
 
-		 if(nbSeenInstances % 101 == 0) 
-			 writeCPointsToFile(1, 2, nbSeenInstances, "IDA");
+		 /*if(nbSeenInstances % 101 == 0) 
+			 writeCPointsToFile(1, 2, nbSeenInstances, "IDA");*/
 	}
 	
 	/**
